@@ -53,17 +53,27 @@ BakerHandle CreateBaker(const Scene* scene){
 
 static_assert(sizeof(glm::vec4) == sizeof(Float4), "glm::vec4 must equal Float4");
 
-void Bake(BakerHandle handle, BakeResult *result){
+// 执行烘焙操作
+void Bake(BakerHandle handle, BakeResult *result) {
+    // 将 BakerHandle 转换为 Baker 指针
     auto b = (Baker*)handle;
+    // 获取 Baker 对象中的模型列表
     const auto &meshes = b->GetModel().Meshes();
+    // 调整结果向量的大小以容纳所有的光照贴图结果
     result->lightmaps.resize(meshes.size());
-    for (uint32_t bakeMeshIdx=0; bakeMeshIdx<meshes.size(); ++bakeMeshIdx){
+    // 遍历每一个网格进行烘焙操作
+    for (uint32_t bakeMeshIdx = 0; bakeMeshIdx < meshes.size(); ++bakeMeshIdx) {
+        // 获取当前网格的光照贴图尺寸
         auto lmsize = meshes[bakeMeshIdx].GetLightmapSize();
+        // 执行烘焙操作
         b->Bake(bakeMeshIdx);
-        auto &lm = result->lightmaps[bakeMeshIdx];
+        // 获取烘焙结果
         const auto& r = b->GetBakeResult(0);
+        // 将烘焙结果拷贝到结果中
+        auto &lm = result->lightmaps[bakeMeshIdx];
         lm.data.resize(r.Size());
-        memcpy(lm.data.data(), r.Data(), r.Size()*sizeof(Float4));
+        memcpy(lm.data.data(), r.Data(), r.Size() * sizeof(Float4));
+        // 设置光照贴图尺寸
         lm.size = lmsize;
     }
 }
