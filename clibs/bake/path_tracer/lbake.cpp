@@ -147,39 +147,62 @@ namespace lua_struct {
         unpack_field(L, idx, "lightmap", v.lightmap);
     }
 
+    // 对特定类型 MaterialData 进行的模板特化函数
     template <>
+    // 使用 inline 关键字进行函数内联，可能提高性能
     inline void unpack<MaterialData>(lua_State* L, int idx, MaterialData& v, void*) {
+        // 检查 Lua 栈中指定位置的值是否为表
         luaL_checktype(L, idx, LUA_TTABLE);
+        // 从 Lua 表中解包"diffuse"字段，并将其赋值给 MaterialData 的 diffuse 成员（可选字段）
         unpack_field_opt(L, idx, "diffuse", v.diffuse);
+        // 从 Lua 表中解包"normal"字段，并将其赋值给 MaterialData 的 normal 成员（可选字段）
         unpack_field_opt(L, idx, "normal", v.normal);
+        // 从 Lua 表中解包"roughness"字段，并将其赋值给 MaterialData 的 roughness 成员（可选字段）
         unpack_field_opt(L, idx, "roughness", v.roughness);
+        // 从 Lua 表中解包"metallic"字段，并将其赋值给 MaterialData 的 metallic 成员（可选字段）
         unpack_field_opt(L, idx, "metallic",   v.metallic);
     }
 
+    // 对特定类型 Light 进行的模板特化函数
     template <>
+    // 使用 inline 关键字进行函数内联，可能提高性能
     inline void unpack<Light>(lua_State* L, int idx, Light& v, void*) {
+        // 检查 Lua 栈中指定位置的值是否为表
         luaL_checktype(L, idx, LUA_TTABLE);
+        // 从 Lua 表中解包"dir"字段，并将其赋值给 Light 结构体的 dir 成员
         unpack_field(L, idx, "dir", v.dir);
+        // 从 Lua 表中解包"pos"字段，并将其赋值给 Light 结构体的 pos 成员
         unpack_field(L, idx, "pos", v.pos);
+        // 从 Lua 表中解包"color"字段，并将其赋值给 Light 结构体的 color 成员
         unpack_field(L, idx, "color", v.color);
 
+        // 从 Lua 表中解包"intensity"字段，并将其赋值给 Light 结构体的 intensity 成员
         unpack_field(L, idx, "intensity", v.intensity);
+        // 从 Lua 表中解包"range"字段，并将其赋值给 Light 结构体的 range 成员
         unpack_field(L, idx, "range", v.range);
+        // 从 Lua 表中解包"inner_cutoff"字段，并将其赋值给 Light 结构体的 inner_cutoff 成员
         unpack_field(L, idx, "inner_cutoff", v.inner_cutoff);
+        // 从 Lua 表中解包"outter_cutoff"字段，并将其赋值给 Light 结构体的 outter_cutoff 成员
         unpack_field(L, idx, "outter_cutoff", v.outter_cutoff);
+        // 从 Lua 表中解包"angular_radius"字段，并将其赋值给 Light 结构体的 angular_radius 成员
         unpack_field(L, idx, "angular_radius", v.angular_radius);
 
+        // 声明一个指针，用于存储从 Lua 表中解包出来的"type"字段的值
         const char* type = nullptr;
+        // 从 Lua 表中解包"type"字段的值
         unpack_field(L, idx, "type", type);
+        // 根据解包得到的光源类型进行处理
         if (strcmp(type, "directional") == 0){
             v.type = Light::LT_Directional;
         } else if (strcmp(type, "point") == 0){
             v.type = Light::LT_Point;
+            // 对于点光源，确保其 range 不为 0
             if (v.range == 0.f){
                 luaL_error(L, "invalid point light, range must not be 0.0");
             }
         } else if (strcmp(type, "spot") == 0){
             v.type = Light::LT_Spot;
+            // 对于聚光灯光源，确保其 range、inner_cutoff 和 outter_cutoff 不为 0
             if (v.range == 0.f){
                 luaL_error(L, "invalid spot light, range must not be 0.0");
             }
@@ -188,10 +211,12 @@ namespace lua_struct {
             }
         } else if (strcmp(type, "area") == 0){
             v.type = Light::LT_Area;
+            // 对于面光源，确保其 angular_radius 不为 0
             if (v.angular_radius == 0.f){
                 luaL_error(L, "invalid area light, angular_radius must not be 0.0");
             }
         } else {
+            // 如果光源类型不是上述任何一种，抛出 Lua 错误，提示光源类型无效
             luaL_error(L, "invalid light type:%s", type);
         }
     }
