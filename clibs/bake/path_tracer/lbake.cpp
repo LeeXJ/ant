@@ -6,21 +6,33 @@
 
 namespace lua_struct {
     template<>
-    inline void unpack<glm::vec3>(lua_State *L, int idx, glm::vec3 &v, void*){
+    // 定义了一个模板特化函数，用于解析 Lua 表中的数据并填充到 glm::vec3 类型的变量中。
+    inline void unpack<glm::vec3>(lua_State *L, int idx, glm::vec3 &v, void*) {
+        // 检查 Lua 栈中指定索引处的值是否为 Lua 表
         luaL_checktype(L, idx, LUA_TTABLE);
-        for (int ii=0; ii<3; ++ii){
+        // 遍历 Lua 表的每个元素，将其填充到 glm::vec3 变量中
+        for (int ii=0; ii<3; ++ii) {
+            // 获取 Lua 表中索引为 ii+1 的值
             lua_geti(L, idx, ii+1);
+            // 将获取到的值转换为浮点数，并赋值给 glm::vec3 的相应分量
             v[ii] = (float)lua_tonumber(L, -1);
+            // 弹出 Lua 栈顶部的值
             lua_pop(L, 1);
         }
     }
 
     template<>
-    inline void unpack<glm::vec4>(lua_State *L, int idx, glm::vec4 &v, void*){
+    // 定义了一个模板特化函数，用于解析 Lua 表中的数据并填充到 glm::vec4 类型的变量中。
+    inline void unpack<glm::vec4>(lua_State *L, int idx, glm::vec4 &v, void*) {
+        // 检查 Lua 栈中指定索引处的值是否为 Lua 表
         luaL_checktype(L, idx, LUA_TTABLE);
-        for (int ii=0; ii<4; ++ii){
+        // 遍历 Lua 表的每个元素，将其填充到 glm::vec4 变量中
+        for (int ii=0; ii<4; ++ii) {
+            // 获取 Lua 表中索引为 ii+1 的值
             lua_geti(L, idx, ii+1);
+            // 将获取到的值转换为浮点数，并赋值给 glm::vec4 的相应分量
             v[ii] = (float)lua_tonumber(L, -1);
+            // 弹出 Lua 栈顶部的值
             lua_pop(L, 1);
         }
     }
