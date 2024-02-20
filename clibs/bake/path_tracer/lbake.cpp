@@ -264,22 +264,40 @@ lbaker_bake(lua_State *L){
 }
 
 static int
-lbaker_destroy(lua_State *L){
+// 定义了一个静态函数，返回一个整数值，表示 Lua 调用此函数后压入栈的值的数量。
+// 这里的 static 关键字表示该函数只能在当前文件中可见，不能在其他文件中使用。
+lbaker_destroy(lua_State *L) {
+    // 从 Lua 栈中获取第一个参数，这里假设该参数是一个指向烘焙器对象的指针
     auto bh = (BakerHandle)lua_touserdata(L, 1);
+    // 调用 DestroyBaker 函数销毁烘焙器对象
     DestroyBaker(bh);
+    // 返回值为 0，表示此函数没有返回值压入栈
     return 0;
 }
 
-extern "C"{
+// extern "C" 用于指定以下代码块中的函数使用 C 语言的调用约定，
+// 这样可以确保编译器不会修改函数名或参数列表，以允许它们与其他语言进行交互（如 Lua）。
+extern "C" {
+
+// LUAMOD_API 宏用于声明一个 Lua 模块的入口函数，
+// 它是一个预处理器宏，用于指定函数的导出属性，以便 Lua 虚拟机能够找到并正确调用它。
 LUAMOD_API int
+// luaopen_bake 是 Lua 加载模块时调用的函数，它应该返回一个整数值，
+// 代表加载成功后压入栈的值的数量，通常是 1。
 luaopen_bake(lua_State* L) {
+    // 定义一个包含函数名和对应 C 函数指针的 luaL_Reg 结构体数组，
+    // 其中每个元素都对应一个 Lua 函数及其实现。
     luaL_Reg lib[] = {
-        {"create",  lbaker_create},
-        {"bake",    lbaker_bake},
-        {"destroy", lbaker_destroy},
-        { nullptr, nullptr },
+        {"create",  lbaker_create},   // 对应 Lua 中的 create 函数
+        {"bake",    lbaker_bake},     // 对应 Lua 中的 bake 函数
+        {"destroy", lbaker_destroy},  // 对应 Lua 中的 destroy 函数
+        { nullptr, nullptr },         // 数组的结尾，用于标识数组结束
     };
+    // 创建一个新的 Lua 库，并将其中的函数注册到 Lua 虚拟机中
     luaL_newlib(L, lib);
+    // 返回值为 1，代表压入栈的值数量为 1
     return 1;
 }
+
+} // extern "C"
 }
