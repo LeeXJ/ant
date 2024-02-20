@@ -95,31 +95,36 @@ struct MeshData {
     Lightmap lightmap;      // 光照贴图
 };
 
-struct Sky{
-    enum SkyType{
-        SimpleColor = 0,
-        CubeMap = 1,
+// Sky 结构体定义了描述天空的属性
+struct Sky {
+    // 定义了天空的类型
+    enum SkyType {
+        SimpleColor = 0,    // 使用简单颜色
+        CubeMap = 1,        // 使用立方体贴图
     };
-    SkyType     type;
-    std::string cubemapTexture;
-    glm::vec3   skyColor;
+    SkyType type;           // 天空的类型
+    std::string cubemapTexture; // 立方体贴图的路径
+    glm::vec3 skyColor;     // 天空的颜色
 };
 
+// Scene 结构体定义了描述场景的属性
 struct Scene {
-    std::vector<Light>          lights;
-    std::vector<MeshData>       models;
-    std::vector<MaterialData>   materials;
+    std::vector<Light> lights;          // 光源列表
+    std::vector<MeshData> models;       // 模型列表
+    std::vector<MaterialData> materials;// 材质列表
 
-    Sky sky;
+    Sky sky;                            // 天空信息
 };
 
-struct LightmapResult{
-    std::vector<glm::vec4>   data;
-    uint16_t size;
+// LightmapResult 结构体定义了描述光照贴图结果的属性
+struct LightmapResult {
+    std::vector<glm::vec4> data; // 存储光照贴图数据的向量
+    uint16_t size;               // 光照贴图的尺寸
 };
 
+// BakeResult 结构体定义了描述烘焙结果的属性
 struct BakeResult {
-    std::vector<LightmapResult> lightmaps;
+    std::vector<LightmapResult> lightmaps; // 存储光照贴图结果的向量
 };
 
 extern BakerHandle CreateBaker(const Scene* scene);
