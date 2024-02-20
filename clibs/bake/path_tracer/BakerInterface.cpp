@@ -68,10 +68,13 @@ void Bake(BakerHandle handle, BakeResult *result){
     }
 }
 
-void DestroyBaker(BakerHandle handle){
+// 销毁 Baker 对象
+void DestroyBaker(BakerHandle handle) {
+    // 将 BakerHandle 转换为 Baker 指针
     auto b = (Baker*)handle;
+    // 调用 Baker 对象的 ShutDown 方法，执行清理操作
     b->ShutDown();
-
+    // 删除 Baker 对象
     delete b;
 }
 
