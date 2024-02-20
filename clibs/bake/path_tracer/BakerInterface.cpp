@@ -78,13 +78,16 @@ void DestroyBaker(BakerHandle handle){
 #include "../Meshbaker/SampleFramework11/v1.02/Graphics/Model.h"
 #include "../Meshbaker/SampleFramework11/v1.02/FileIO.h"
 
-//static
-void Baker::InitLights(const Scene *s, Lights &lights)
-{
+// 初始化光源数据
+void Baker::InitLights(const Scene *s, Lights &lights) {
+    // 预留足够的空间以容纳所有光源
     lights.reserve(s->lights.size());
-    for (const auto &l : s->lights)
-    {
+    
+    // 遍历场景中的每一个光源
+    for (const auto &l : s->lights) {
+        // 创建一个 LightData 结构体实例，用于存储光源数据
         LightData ld;
+        // 将光源的位置、方向、颜色、强度等属性赋值给 LightData 结构体
         ld.pos = Float3(l.pos.x, l.pos.y, l.pos.z);
         ld.dir = Float3(l.dir.x, l.dir.y, l.dir.z);
         ld.color = Float3(l.color.x, l.color.y, l.color.z);
@@ -93,8 +96,9 @@ void Baker::InitLights(const Scene *s, Lights &lights)
         ld.inner_cutoff = l.inner_cutoff;
         ld.outter_cutoff = l.outter_cutoff;
         ld.angular_radius = l.angular_radius;
-        ld.type = LightData::LightType(l.type);
+        ld.type = LightData::LightType(l.type); // 将光源类型转换为 LightData::LightType 枚举类型
 
+        // 将 LightData 实例添加到光源列表中
         lights.emplace_back(ld);
     }
 }
@@ -132,18 +136,21 @@ void Model::CreateFromScene(ID3D11Device *device, const Scene *scene, bool force
     }
 }
 
-static inline const char*
-src_ptr(const BufferData &b, size_t idx){
+// src_ptr 函数用于获取缓冲区数据中指定索引处的指针
+static inline const char* src_ptr(const BufferData &b, size_t idx) {
+    // 计算指定索引处的数据指针位置，并返回该位置的指针
+    // 具体位置计算公式为：数据起始位置 + 偏移量 + 索引 * 步长
     return b.data + b.offset + idx * b.stride;
 }
 
-struct VertexData{
-    Float3 pos;
-    Float3 normal;
-    Float2 texcoord0;
-    Float2 lightmapuv;
-    Float3 tangent;
-    Float3 bitangent;
+// VertexData 结构体定义了描述顶点数据的属性
+struct VertexData {
+    Float3 pos;         // 顶点位置
+    Float3 normal;      // 顶点法线
+    Float2 texcoord0;   // 第一组纹理坐标
+    Float2 lightmapuv;  // 光照贴图 UV 坐标
+    Float3 tangent;     // 切线
+    Float3 bitangent;   // 双切线
 };
 
 static void GenerateTangentAndBitangents(VertexData *vertices, uint32 numVertices, const BufferData &indices, uint32 numIndices)
