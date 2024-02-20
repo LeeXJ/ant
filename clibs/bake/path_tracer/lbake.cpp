@@ -55,57 +55,95 @@ namespace lua_struct {
         }
     }
 
+    // 在解包时，针对特定类型的BufferData，这是一个模板特化函数
     template <>
+    // inline关键字用于优化性能，通常用于简单的函数
     inline void unpack<BufferData>(lua_State* L, int idx, BufferData& v, void*) {
+        // 检查 Lua 栈上指定位置的值是否为表
         luaL_checktype(L, idx, LUA_TTABLE);
+        // 从表中解包"data"字段，并将其赋值给BufferData的"data"成员
         unpack_field(L, idx, "data", v.data);
+        // 从表中解包"offset"字段，并将其赋值给BufferData的"offset"成员
         unpack_field(L, idx, "offset", v.offset);
+        // 从表中解包"stride"字段，并将其赋值给BufferData的"stride"成员
         unpack_field(L, idx, "stride", v.stride);
+        // 声明一个指针，用于存储从 Lua 表中解包出来的"type"字段的值
         const char* type = nullptr;
+        // 从 Lua 表中解包"type"字段的值
         unpack_field(L, idx, "type", type);
+        // 根据解包得到的数据类型进行处理
         switch (type[0]){
+            // 如果数据类型是 'B'，将BufferData的"type"成员设置为 BT_Byte
             case 'B': v.type = BT_Byte; break;
+            // 如果数据类型是 'H'，将BufferData的"type"成员设置为 BT_Uint16
             case 'H': v.type = BT_Uint16; break;
+            // 如果数据类型是 'I'，将BufferData的"type"成员设置为 BT_Uint32
             case 'I': v.type = BT_Uint32; break;
+            // 如果数据类型是 'f'，将BufferData的"type"成员设置为 BT_Float
             case 'f': v.type = BT_Float; break;
+            // 如果数据类型是空字符，将BufferData的"type"成员设置为 BT_None
             case '\0':v.type = BT_None; break;
+            // 如果数据类型不是上述任何一种，抛出 Lua 错误，提示数据类型无效
             default: luaL_error(L, "invalid data type:%s", type);
         }
     }
 
+    // 对特定类型 MeshData 进行的模板特化函数
     template <>
+    // 使用 inline 关键字进行函数内联，可能提高性能
     inline void unpack<MeshData>(lua_State* L, int idx, MeshData& v, void*) {
+        // 检查 Lua 栈中指定位置的值是否为表
         luaL_checktype(L, idx, LUA_TTABLE);
+        // 从 Lua 表中解包"worldmat"字段，并将其赋值给 MeshData 的 worldmat 成员
         unpack_field(L, idx, "worldmat", v.worldmat);
+        // 从 Lua 表中解包"normalmat"字段，并将其赋值给 MeshData 的 normalmat 成员
         unpack_field(L, idx, "normalmat", v.normalmat);
 
+        // 从 Lua 表中解包"positions"字段，并将其赋值给 MeshData 的 positions 成员
         unpack_field(L, idx, "positions", v.positions);
+        // 从 Lua 表中解包"normals"字段，并将其赋值给 MeshData 的 normals 成员
         unpack_field(L, idx, "normals",   v.normals);
+        // 设置 tangents 成员的 type 为 BT_None
         v.tangents.type = BT_None;
+        // 从 Lua 表中解包"tangents"字段，并将其赋值给 MeshData 的 tangents 成员（可选字段）
         unpack_field_opt(L, idx, "tangents", v.tangents);
+        // 设置 bitangents 成员的 type 为 BT_None
         v.bitangents.type = BT_None;
+        // 从 Lua 表中解包"bitangents"字段，并将其赋值给 MeshData 的 bitangents 成员（可选字段）
         unpack_field_opt(L, idx, "bitangents", v.bitangents);
 
+        // 从 Lua 表中解包"texcoords0"字段，并将其赋值给 MeshData 的 texcoords0 成员
         unpack_field(L, idx, "texcoords0", v.texcoords0);
 
+        // 设置 texcoords1 成员的 type 为 BT_None
         v.texcoords1.type = BT_None;
+        // 从 Lua 表中解包"texcoords1"字段，并将其赋值给 MeshData 的 texcoords1 成员（可选字段）
         unpack_field_opt(L, idx, "texcoords1", v.texcoords1);
+        // 如果 texcoords1 成员的 type 为 BT_None，则将其值设置为 texcoords0 的值
         if (v.texcoords1.type == BT_None){
             v.texcoords1 = v.texcoords0;
         }
 
+        // 从 Lua 表中解包"vertexCount"字段，并将其赋值给 MeshData 的 vertexCount 成员
         unpack_field(L, idx, "vertexCount", v.vertexCount);
 
-        // for indices
+        // 为 indices 成员的 type 设置为 BT_None
         v.indices.type = BT_None;
+        // 从 Lua 表中解包"indices"字段，并将其赋值给 MeshData 的 indices 成员（可选字段）
         unpack_field_opt(L, idx, "indices", v.indices);
+        // 设置 indexCount 成员的初始值为 0
         v.indexCount = 0;
+        // 从 Lua 表中解包"indexCount"字段，并将其赋值给 MeshData 的 indexCount 成员（可选字段）
         unpack_field_opt(L, idx, "indexCount", v.indexCount);
 
+        // 从 Lua 表中解包"materialidx"字段，并将其赋值给 MeshData 的 materialidx 成员
         unpack_field(L, idx, "materialidx", v.materialidx);
+        // 确保 materialidx 大于 0
         assert(v.materialidx > 0);
+        // 将 materialidx 减去 1（一般索引从 0 开始）
         --v.materialidx;
 
+        // 从 Lua 表中解包"lightmap"字段，并将其赋值给 MeshData 的 lightmap 成员
         unpack_field(L, idx, "lightmap", v.lightmap);
     }
 
