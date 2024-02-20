@@ -229,37 +229,58 @@ LUA2STRUCT(Scene, models, lights, materials);
     //     s.materials.push_back(MaterialData());
     // }
 static int
-lbaker_create(lua_State *L){
+// 定义了一个静态函数，返回一个整数值，表示 Lua 调用此函数后压入栈的值的数量。
+// 这里的 static 关键字表示该函数只能在当前文件中可见，不能在其他文件中使用。
+lbaker_create(lua_State *L) {
+    // 创建一个 Scene 结构体，用于存储 Lua 环境传入的场景数据
     Scene s;
+    // 使用 lua_struct 库中的 unpack 函数将 Lua 栈中的第一个参数解包到 Scene 结构体中
     lua_struct::unpack(L, 1, s);
+    // 调用 CreateBaker 函数创建一个烘焙器对象，并将场景数据传入
     BakerHandle bh = CreateBaker(&s);
+    // 将烘焙器对象的指针压入 Lua 栈
     lua_pushlightuserdata(L, bh);
+    // 返回值为 1，代表压入栈的值数量为 1
     return 1;
 }
 
 static int
-lbaker_bake(lua_State *L){
+// 定义了一个静态函数，返回一个整数值，表示 Lua 调用此函数后压入栈的值的数量。
+// 这里的 static 关键字表示该函数只能在当前文件中可见，不能在其他文件中使用。
+lbaker_bake(lua_State *L) {
+    // 从 Lua 栈中获取第一个参数，这里假设该参数是一个指向烘焙器对象的指针
     auto bh = (BakerHandle)lua_touserdata(L, 1);
+    // 创建一个用于存储烘焙结果的结构体
     BakeResult br;
+    // 调用 Bake 函数执行烘焙操作，并将结果存储在 br 变量中
     Bake(bh, &br);
 
+    // 创建一个 Lua 表，用于存储烘焙结果的光照贴图
     lua_createtable(L, (int)br.lightmaps.size(), 0);
-    for (size_t ii=0; ii<br.lightmaps.size(); ++ii){
+    // 遍历烘焙结果中的每个光照贴图
+    for (size_t ii=0; ii<br.lightmaps.size(); ++ii) {
+        // 创建一个 Lua 表，用于存储当前光照贴图的信息
         lua_createtable(L, 0, 3);{
+            // 获取当前光照贴图的数据并压入 Lua 栈
             const auto &lm = br.lightmaps[ii];
             const auto texelsize = sizeof(glm::vec4);
             lua_pushlstring(L, (const char*)lm.data.data(), lm.data.size() * texelsize);
+            // 将数据存储在 Lua 表中，并命名为 "data"
             lua_setfield(L, -2, "data");
 
+            // 将当前光照贴图的尺寸存储在 Lua 表中，并命名为 "size"
             lua_pushinteger(L, lm.size);
             lua_setfield(L, -2, "size");
 
+            // 将当前光照贴图的像素大小存储在 Lua 表中，并命名为 "texelsize"
             lua_pushinteger(L, texelsize);
             lua_setfield(L, -2, "texelsize");
         }
+        // 将当前光照贴图的 Lua 表存储在结果表中
         lua_seti(L, -2, ii+1);
     }
 
+    // 返回值为 1，代表压入栈的值数量为 1
     return 1;
 }
 
