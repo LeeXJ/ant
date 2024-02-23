@@ -20,11 +20,12 @@ local Q         = world:clibs "render.queue"
 
 local itimer    = ecs.require "ant.timer|timer_system"
 local ivs       = ecs.require "ant.render|visible_state"
-local qm        = ecs.require "ant.render|queue_mgr"
+local queuemgr  = ecs.require "ant.render|queue_mgr"
 local ilight    = ecs.require "ant.render|light.light"
 local iviewport = ecs.require "ant.render|viewport.state"
 local iom       = ecs.require "ant.objcontroller|obj_motion"
 local efk_sys = ecs.system "efk_system"
+local RC        = world:clibs "render.cache"
 local iefk = {}
 
 local handle_mt = {
@@ -76,9 +77,14 @@ local function createPlayHandle(efk_handle, speed, startframe, fadeout, worldmat
 end
 
 function efk_sys:init()
+    queuemgr.register_queue "efk_queue"
     EFK_SERVER = ltask.spawn "ant.efk|efk"
     ltask.call(EFK_SERVER, "init")
     ltask.call(EFK_SERVER, "init_default_tex2d", assetmgr.default_textureid "SAMPLER2D")
+end
+
+function efk_sys:post_init()
+    RC.set_queue_type("efk_queue", queuemgr.queue_index "efk_queue")
 end
 
 local function cleanup_efk(efk)
@@ -169,9 +175,15 @@ local need_update_framebuffer
 
 local effect_viewid<const> = hwi.viewid_get "effect_view"
 
+local function create_fb()
+    local tmq = w:first "tonemapping_queue render_target:in"
+    local mq = w:first "main_queue render_target:in"
+    return fbmgr.create(
+        {rbidx = fbmgr.get(tmq.render_target.fb_idx)[1].rbidx},
+        {rbidx = fbmgr.get(mq.render_target.fb_idx)[2].rbidx})
+end
+
 function efk_sys:init_world()
-    local mq = w:first("main_queue render_target:in camera_ref:in")
-    local main_fb = fbmgr.get(mq.render_target.fb_idx)
     local vr = iviewport.viewrect
     world:create_entity{
         policy = {
@@ -179,34 +191,18 @@ function efk_sys:init_world()
             "ant.render|watch_screen_buffer",
         },
         data = {
+            visible = true,
+            submit_queue = true,
             efk_queue = true,
             render_target = {
                 view_rect = {x=vr.x, y=vr.y, w=vr.w, h=vr.h},
                 viewid = effect_viewid,
-                fb_idx = fbmgr.create(table.unpack(main_fb)),
+                fb_idx = create_fb(),
                 view_mode = "s",
-                clear_state = {
-                    clear = "",
-                },
+                clear_state = {clear = "",},
             },
             queue_name = "efk_queue",
             watch_screen_buffer = true,
-            on_ready = function(e)
-                local tmq = w:first "tonemapping_queue render_target:in"
-                w:extend(e, "render_target:update")
-                local fbidx = e.render_target.fb_idx
-                local tm_rb = fbmgr.get(tmq.render_target.fb_idx)[1]
-                local depth_rb = fbmgr.get(mq.render_target.fb_idx)[2]
-                local depth_rb_table = fbmgr.get_rb(depth_rb.rbidx)
-                local ww, hh = depth_rb_table.w, depth_rb_table.h
-                fbmgr.resize_rb(tm_rb.rbidx, ww, hh)
-                local fb = {
-                    {rbidx = tm_rb.rbidx},
-                    {rbidx = depth_rb.rbidx}
-                }
-                fbmgr.recreate(fbidx, fb)
-                need_update_framebuffer = true
-            end
         }
     }
 
@@ -246,8 +242,8 @@ function efk_sys:follow_scene_update()
 	end
 
     for e in w:select "visible_state_changed efk_object:update efk:in visible_state:in" do
-        local visible = e.visible_state.main_queue
-        Q.set(e.efk_object.visible_idx, qm.queue_index "main_queue", visible)
+        local visible = e.visible_state.main_queue and true or false
+        Q.set(e.efk_object.visible_idx, queuemgr.queue_index "efk_queue", visible)
         e.efk.play_handle:set_visible(visible)
     end
 end

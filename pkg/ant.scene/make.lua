@@ -10,9 +10,6 @@ lm:lua_source "scene" {
     sources = {
         "scene.cpp"
     },
-    defines = {
-        "GLM_FORCE_QUAT_DATA_XYZW",
-    },
     deps = "foundation",
     objdeps = "compile_ecs",
 }

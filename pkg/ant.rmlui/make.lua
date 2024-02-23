@@ -31,7 +31,6 @@ lm:lua_source "rmlui_core" {
         lm.AntDir .. "/clibs/luabind",
     },
     defines = {
-        "GLM_FORCE_QUAT_DATA_XYZW",
         lm.mode == "debug" and "DEBUG",
     },
     sources = {
@@ -50,7 +49,6 @@ lm:lua_source "rmlui_css" {
         lm.AntDir .. "/clibs/luabind",
     },
     defines = {
-        "GLM_FORCE_QUAT_DATA_XYZW",
         lm.mode == "debug" and "DEBUG",
     },
     sources = {
@@ -71,7 +69,6 @@ lm:lua_source "rmlui_binding" {
         lm.AntDir .. "/pkg/ant.resource_manager/src/",
         lm.AntDir .. "/pkg/ant.font/src/",
     },
-    defines = "GLM_FORCE_QUAT_DATA_XYZW",
     sources = {
         "src/binding/*.cpp",
     }

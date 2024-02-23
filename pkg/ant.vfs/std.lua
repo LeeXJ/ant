@@ -11,6 +11,10 @@ function REPO_MT:__close()
 	self._lock:close()
 end
 
+function REPO_MT:close()
+	self._lock:close()
+end
+
 local function filelock(filepath)
 	filepath = filepath / "vfs.lock"
 	local f = lfs.filelock(filepath)
@@ -126,16 +130,14 @@ local resource_filter <const> = {
 	},
 }
 
+local resource <const> = { "material" , "glb" , "gltf", "texture" }
+
 local block <const> = {
     "/res",
     "/pkg/ant.bake",
-    "/pkg/ant.resources.binary/meshes/test",
-    "/pkg/ant.resources.binary/test",
 }
 
-local resource <const> = { "material" , "glb" , "gltf", "texture" }
-
-local game_whitelist <const> = {
+local whitelist <const> = {
 	"ant",
 	-- ecs
 	"prefab",
@@ -153,14 +155,9 @@ local game_whitelist <const> = {
 	"ttc", --TODO: remove it?
 	-- sound
 	"bank",
-	-- animation
-	"event",
-	"anim",
-	"bin",
 	-- material
-	"state",
-	"varyings",
-	"names"
+	"state",    --TODO: use ant
+	"varyings", --TODO: use ant
 }
 
 local function table_append(t, a)
@@ -189,10 +186,16 @@ end
 local function read_vfsignore(rootpath)
 	if not lfs.exists(rootpath / ".vfsignore") then
 		return {
+			whitelist = whitelist,
 			block = block,
 		}
 	end
 	local r = datalist.parse(fastio.readall_f((rootpath / ".vfsignore"):string()))
+	if r.whitelist then
+		table_append(r.whitelist, whitelist)
+	else
+		r.whitelist = whitelist
+	end
 	if r.block then
 		table_append(r.block, block)
 	else
@@ -231,7 +234,7 @@ local function new_std(t)
 			path = repo._mountlpath[i]:string(),
 			filter = {
 				resource = resource,
-				whitelist = game_whitelist,
+				whitelist = vfsignore.whitelist,
 				block = vfsignore.block,
 				ignore = vfsignore.ignore,
 			},

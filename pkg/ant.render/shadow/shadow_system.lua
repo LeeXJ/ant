@@ -40,6 +40,7 @@ local moveCameraToOrigin<const> = false
 
 local CLEAR_SM_viewid<const> = hwi.viewid_get "csm_fb"
 local function create_clear_shadowmap_queue(fbidx)
+	assert(queuemgr.has "clear_sm")
 	local rb = fbmgr.get_rb(fbidx, 1)
 	local ww, hh = rb.w, rb.h
 	world:create_entity{
@@ -97,6 +98,7 @@ local function create_csm_entity(index, vr, fbidx)
 			},
 			visible = false,
 			queue_name = queuename,
+			submit_queue = true,
 			[queuename] = true,
 		},
 	}
@@ -107,6 +109,7 @@ local shadow_material
 local di_shadow_material
 local gpu_skinning_material
 function shadow_sys:init()
+	queuemgr.register_queue "clear_sm"
 	local midx = queuemgr.material_index "csm1_queue"
 	assert(midx == queuemgr.material_index "csm2_queue")
 	assert(midx == queuemgr.material_index "csm3_queue")
@@ -264,7 +267,7 @@ local function build_sceneaabbLS(si, li)
 	return PSRLS
 end
 
-local function check_changed()
+local function shadow_changed()
 	local C = irq.main_camera_changed()
 	local D = w:first "make_shadow scene_changed directional_light"
 	if C or D then
@@ -273,7 +276,7 @@ local function check_changed()
 end
 
 function shadow_sys:update_camera()
-	local changed, C, D = check_changed()
+	local changed, C, D = shadow_changed()
 	if changed then
 		if C then
 			w:extend(C, "camera:in scene:in")
@@ -295,7 +298,7 @@ function shadow_sys:update_camera()
 end
 
 function shadow_sys:update_camera_depend()
-	local changed, C = check_changed()
+	local changed, C = shadow_changed()
 	if not changed then
 		return
 	end
@@ -312,7 +315,6 @@ function shadow_sys:update_camera_depend()
 		return
 	end
 	si.sceneaabbLS = build_sceneaabbLS(si, li)
-
 	local CF = C.camera.frustum
 	si.view_near, si.view_far = CF.n, CF.f
 	local zn, zf = assert(si.zn), assert(si.zf)
@@ -411,3 +413,9 @@ function shadow_sys:entity_ready()
 		e.receive_shadow	= receiveshadow
 	end
 end
+
+
+local ishadow = {}
+ishadow.shadow_changed = shadow_changed
+
+return ishadow

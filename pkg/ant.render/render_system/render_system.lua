@@ -26,6 +26,7 @@ local RM        = ecs.require "ant.material|material"
 
 local render_sys= ecs.system "render_system"
 local R			= world:clibs "render.render_material"
+local RC		= world:clibs "render.cache"
 
 function render_sys:device_check()
 	local caps = bgfx.get_caps()
@@ -53,6 +54,11 @@ end
 
 function render_sys:start_frame()
 	assetmgr.material_check()
+end
+
+function render_sys:post_init()
+	RC.set_queue_type("main_queue", queuemgr.queue_index "main_queue")
+	RC.set_queue_type("pre_depth_queue", queuemgr.queue_index "pre_depth_queue")
 end
 
 --[[
@@ -269,11 +275,9 @@ function render_sys:entity_init()
 		check_update_main_queue_material(e)
 	end
 
-	for qe in w:select "INIT queue_name:in render_target:in" do
+	for qe in w:select "INIT submit_queue queue_name:in render_target:in" do
 		local qn = qe.queue_name
-		if not queuemgr.has(qn) then
-			queuemgr.register_queue(qn)
-		end
+		local _ = queuemgr.has(qn) or error(("Invalid queue_name:%s, need register"):format(qn))
 		RENDER_ARGS[qn].viewid = qe.render_target.viewid
 	end
 
@@ -339,14 +343,10 @@ end
 
 function render_sys:update_render_args()
 	w:clear "render_args"
-	if irender.stop_draw() then
-		for qe in w:select "swapchain_queue queue_name:in render_target:in render_args:new" do
+	if not irender.stop_draw() then
+		for qe in w:select "submit_queue visible queue_name:in render_target:in render_args:new" do
 			add_render_arg(qe)
 		end
-		return
-	end
-	for qe in w:select "visible queue_name:in render_target:in render_args:new" do
-		add_render_arg(qe)
 	end
 end
 

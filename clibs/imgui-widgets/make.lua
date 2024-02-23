@@ -21,7 +21,6 @@ lm:source_set "imgui" {
         "widgets/*.cpp",
     },
     defines = {
-        "GLM_FORCE_QUAT_DATA_XYZW",
         defines,
     },
 }
@@ -36,7 +35,6 @@ lm:lua_source "imgui" {
         "luabinding.cpp",
     },
     defines = {
-        "GLM_FORCE_QUAT_DATA_XYZW",
         defines,
     },
 }

@@ -23,22 +23,12 @@ local imaterial = ecs.require "ant.asset|material"
 local irender   = ecs.require "ant.render|render"
 local irq       = ecs.require "ant.render|render_system.renderqueue"
 local iviewport = ecs.require "ant.render|viewport.state"
+local queuemgr  = ecs.require "queue_mgr"
 
-function fxaasys:init()
-    world:create_entity{
-        policy = {
-            "ant.render|simplerender",
-        },
-        data = {
-            simplemesh      = irender.full_quad(),
-            material        = "/pkg/ant.resources/materials/postprocess/fxaa.material",
-            visible_state   = "fxaa_queue",
-            fxaa_drawer     = true,
-            scene           = {},
-        }
-    }
-end
+local fxaa_viewid<const> = hwi.viewid_get "fxaa"
 
+local RENDER_ARG
+local fxaadrawer_eid
 local function create_fb(vr)
     local minmag_flag<const> = ENABLE_TAA and "POINT" or "LINEAR"
     return fbmgr.create{
@@ -57,11 +47,27 @@ local function create_fb(vr)
     }
 end
 
-local fxaa_viewid<const> = hwi.viewid_get "fxaa"
+local function register_queue()
+    queuemgr.register_queue "fxaa_queue"
+    RENDER_ARG = irender.pack_render_arg("fxaa_queue", fxaa_viewid)
 
-function fxaasys:init_world()
     local vr = mu.copy_viewrect(iviewport.viewrect)
     util.create_queue(fxaa_viewid, mu.copy_viewrect(iviewport.viewrect), create_fb(vr), "fxaa_queue", "fxaa_queue", true)
+end
+
+function fxaasys:init()
+    register_queue()
+    fxaadrawer_eid = world:create_entity{
+        policy = {
+            "ant.render|simplerender",
+        },
+        data = {
+            simplemesh      = irender.full_quad(),
+            material        = "/pkg/ant.resources/materials/postprocess/fxaa.material",
+            visible_state   = "",
+            scene           = {},
+        }
+    }
 end
 
 local vr_mb = world:sub{"view_rect_changed", "main_queue"}
@@ -75,7 +81,7 @@ local get_scene_ldr_handle; do
 end
 
 local function update_scene_ldr()
-    local fd = w:first "fxaa_drawer filter_material:in"
+    local fd = world:entity(fxaadrawer_eid, "filter_material:in")
     imaterial.set_property(fd, "s_scene_ldr_color", get_scene_ldr_handle())
 end
 
@@ -85,4 +91,8 @@ function fxaasys:fxaa()
         update_scene_ldr()
         break
     end
+end
+
+function fxaasys:render_submit()
+    irender.draw(RENDER_ARG, fxaadrawer_eid)
 end

@@ -19,22 +19,10 @@ local ENABLE_FXAA<const>    = setting:get "graphic/postprocess/fxaa/enable"
 local ENABLE_TAA<const>     = setting:get "graphic/postprocess/taa/enable"
 local ENABLE_TM_LUT<const>  = setting:get "graphic/postprocess/tonemapping/use_lut"
 local tm_viewid<const>      = hwi.viewid_get "tonemapping"
+local queuemgr              = ecs.require "queue_mgr"
 
-function tm_sys:init()
-    local drawer_material = ENABLE_TM_LUT and "/pkg/ant.resources/materials/postprocess/tonemapping_lut.material" or "/pkg/ant.resources/materials/postprocess/tonemapping.material"
-    world:create_entity{
-        policy = {
-            "ant.render|simplerender",
-        },
-        data = {
-            simplemesh      = irender.full_quad(),
-            material        = drawer_material,
-            visible_state   = "tonemapping_queue",
-            tonemapping_drawer=true,
-            scene           = {},
-        }
-    }
-end
+local RENDER_ARG
+local tonemapping_drawer_eid
 
 local function check_create_fb(vr)
     if ENABLE_TAA or ENABLE_FXAA then
@@ -55,9 +43,29 @@ local function check_create_fb(vr)
     end
 end
 
-function tm_sys:init_world()
+local function register_queue()
+    queuemgr.register_queue "tonemapping_queue"
+    RENDER_ARG = irender.pack_render_arg("tonemapping_queue", tm_viewid)
+
     local vr = mu.copy_viewrect(iviewport.viewrect)
     util.create_queue(tm_viewid, vr, check_create_fb(vr), "tonemapping_queue", "tonemapping_queue", ENABLE_FXAA or ENABLE_TAA)
+end
+
+function tm_sys:init()
+    register_queue()
+    local drawer_material = ENABLE_TM_LUT and "/pkg/ant.resources/materials/postprocess/tonemapping_lut.material" or "/pkg/ant.resources/materials/postprocess/tonemapping.material"
+    tonemapping_drawer_eid = world:create_entity{
+        policy = {
+            "ant.render|simplerender",
+        },
+        data = {
+            simplemesh      = irender.full_quad(),
+            material        = drawer_material,
+            visible_state   = "",
+            tonemapping_drawer=true,
+            scene           = {},
+        }
+    }
 end
 
 local vr_mb = world:sub{"view_rect_changed", "main_queue"}
@@ -86,4 +94,8 @@ end
 function tm_sys:tonemapping()
     local m = w:first "tonemapping_drawer filter_material:in"
     update_properties(m.filter_material.DEFAULT_MATERIAL)
+end
+
+function tm_sys:render_submit()
+    irender.draw(RENDER_ARG, tonemapping_drawer_eid)
 end

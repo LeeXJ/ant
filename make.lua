@@ -1,6 +1,6 @@
 local lm = require "luamake"
 
-lm:required_version "1.5"
+lm:required_version "1.6"
 --lm.luaversion = "lua55"
 
 local plat = (function ()
@@ -16,73 +16,68 @@ local plat = (function ()
     return lm.os
 end)()
 
-lm.mode = "debug"
-lm.builddir = ("build/%s/%s"):format(plat, lm.mode)
-lm.bindir = ("bin/%s/%s"):format(plat, lm.mode)
-lm.compile_commands = "build"
-
 lm.AntDir = lm:path "."
 
-local EnableEditor = true
-if lm.os == "ios" then
-    lm.arch = "arm64"
-    lm.sys = "ios16.0"
-    EnableEditor = false
-end
-
-if lm.os == "android" then
-    EnableEditor = false
-end
-
-lm.c = "c17"
-lm.cxx = "c++20"
-lm.msvc = {
+lm:conf {
+    compile_commands = "build",
+    mode = "debug",
+    c = "c17",
+    cxx = "c++20",
+    --TODO
+    visibility = "default",
     defines = {
-        "_CRT_SECURE_NO_WARNINGS",
-        "_WIN32_WINNT=0x0601",
+        "BGFX_CONFIG_DEBUG_UNIFORM=0",
+        "GLM_ENABLE_EXPERIMENTAL",
+        "GLM_FORCE_QUAT_DATA_XYZW",
+        "GLM_FORCE_INTRINSICS",
     },
-    flags = {
-        "-wd5105"
-    }
-}
-
-lm:config "engine_config" {
     msvc = {
-        flags = "/utf-8",
+        defines = {
+            "_CRT_SECURE_NO_WARNINGS",
+            "_WIN32_WINNT=0x0601",
+        },
+        flags = {
+            "/utf-8",
+            "/arch:AVX2",
+        }
     },
-    defines = "BGFX_CONFIG_DEBUG_UNIFORM=0"
-}
-
-lm.configs = {
-    "engine_config",
-    --"sanitize"
-}
-
-if lm.mode == "release" then
-    lm.msvc.ldflags = {
-        "/DEBUG:FASTLINK"
-    }
-end
-
-lm.ios = {
-    flags = {
-        "-fembed-bitcode",
-        "-fobjc-arc"
+    ios = {
+        arch = "arm64",
+        sys = "ios16.0",
+        flags = {
+            "-fembed-bitcode",
+            "-fobjc-arc"
+        }
+    },
+    android  = {
+        flags = "-fPIC",
+        arch = "aarch64",
+        vendor = "linux",
+        sys = "android33",
     }
 }
 
-lm.android  = {
-    flags = "-fPIC",
-}
+lm.builddir = ("build/%s/%s"):format(plat, lm.mode)
+lm.bindir = ("bin/%s/%s"):format(plat, lm.mode)
 
-if lm.os == "android" then
-    lm.arch = "aarch64"
-    lm.vendor = "linux"
-    lm.sys = "android33"
+if lm.sanitize then
+    lm.builddir = ("build/%s/sanitize"):format(plat)
+    lm.bindir = ("bin/%s/sanitize"):format(plat)
+    lm:conf {
+        mode = "debug",
+        flags = "-fsanitize=address",
+        gcc = {
+            ldflags = "-fsanitize=address"
+        },
+        clang = {
+            ldflags = "-fsanitize=address"
+        }
+    }
+    lm:msvc_copydll "copy_asan" {
+        type = "asan",
+        output = lm.bindir,
+    }
 end
-
---TODO
-lm.visibility = "default"
 
 lm:import "runtime/make.lua"
 
@@ -97,7 +92,7 @@ lm:runlua "compile_ecs" {
     output = "clibs/ecs/ecs/component.hpp",
 }
 
-if EnableEditor then
+if lm.os ~= "ios" and lm.os ~= "android" then
     lm:phony "tools" {
         deps = {
             "gltf2ozz",
@@ -112,7 +107,12 @@ if EnableEditor then
             "tools",
         }
     }
-    lm:default "editor"
+    lm:default {
+        "editor",
+        lm.compiler == "msvc" and lm.sanitize and "copy_asan",
+    }
 else
-    lm:default "runtime"
+    lm:default {
+        "runtime",
+    }
 end

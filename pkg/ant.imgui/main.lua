@@ -62,6 +62,8 @@ end
 
 local ImGuiEvent = {}
 
+local CaptureMouse = {}
+
 function ImGuiEvent.mouseclick(e)
     local btn = 0
     if e.what == "LEFT" then
@@ -73,10 +75,25 @@ function ImGuiEvent.mouseclick(e)
     end
     if e.state == "DOWN" then
         ImGuiIO.AddMouseButtonEvent(btn, true)
+        if ImGuiIO.WantCaptureMouse then
+            CaptureMouse[e.what] = true
+        end
+        return ImGuiIO.WantCaptureMouse
     elseif e.state == "UP" then
+        local capture = CaptureMouse[e.what]
+        CaptureMouse[e.what] = nil
         ImGuiIO.AddMouseButtonEvent(btn, false)
+        return capture
     end
-    return ImGuiIO.WantCaptureMouse
+end
+
+function ImGuiEvent.mousemove(e)
+    local capture
+    for btn in pairs(CaptureMouse) do
+        e.what[btn] = nil
+        capture = true
+    end
+    return capture and (next(e.what) == nil)
 end
 
 function ImGuiEvent.mousewheel(e)

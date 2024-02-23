@@ -6,6 +6,7 @@ local math3d    = require "math3d"
 local mathpkg   = import_package "ant.math"
 local mc, mu    = mathpkg.constant, mathpkg.util
 local ig        = ecs.require "ant.group|group"
+local irq       = ecs.require "render_system.renderqueue"
 local Q         = world:clibs "render.queue"
 local ivs       = ecs.require "ant.render|visible_state"
 local hwi       = import_package "ant.hwi"
@@ -21,7 +22,7 @@ end}
 local INDIRECT_DRAW_GROUPS = setmetatable({}, GID_MT)
 local DIRTY_GROUPS, DIRECT_DRAW_GROUPS = {}, {}
 local HITCH_MAPS = {}
-
+local HITCH_CULL = {}
 local h = ecs.component "hitch"
 function h.init(hh)
     assert(hh.group ~= nil)
@@ -195,6 +196,7 @@ function hitch_sys:finish_scene_update()
         for _, heid in ipairs(hitchs) do
             local he<close> = world:entity(heid, "hitch:in eid:in bounding:update scene:in scene_needchange?out")
             set_dirty_hitch_group(he.hitch, he.eid, true)
+            HITCH_CULL[heid] = false
             he.scene_needchange = true
 
             if math3d.aabb_isvalid(objaabb) then
@@ -206,24 +208,21 @@ function hitch_sys:finish_scene_update()
     w:clear "hitch_create"
 end
 
-local tick<const> = 10
-local cur_tick = 0
 
 function hitch_sys:refine_camera()
     -- remove hitch / hitch scene_update / reset hitch group
-    for e in w:select "hitch_update hitch:in eid:in" do
-        set_dirty_hitch_group(e.hitch, e.eid, true)
+    for e in w:select "hitch_update hitch:in eid:in view_visible?in" do
+        set_dirty_hitch_group(e.hitch, e.eid, e.view_visible)
     end
-
-    -- group cull
-    if cur_tick >= tick then
+    if irq.main_camera_changed() then
         for e in w:select "hitch:in eid:in view_visible?in" do
-            set_dirty_hitch_group(e.hitch, e.eid, e.view_visible) 
-        end
-        cur_tick = 0
-    else
-        cur_tick = cur_tick + 1
-    end  
+            local is_culled = not e.view_visible
+            if HITCH_CULL[e.eid] ~= is_culled then
+                HITCH_CULL[e.eid] = is_culled
+                set_dirty_hitch_group(e.hitch, e.eid, e.view_visible) 
+            end
+        end        
+    end
 
     for gid in pairs(DIRTY_GROUPS) do
         ig.enable(gid, "view_visible", true)
@@ -235,11 +234,16 @@ function hitch_sys:refine_camera()
             
             local memory, draw_num = get_hitch_worldmats_instance_memory(indirect_draw_group.hitchs)
             local glbs = {}
-            for re in w:select "hitch_tag mesh_result draw_indirect eid:in render_object_visible?update" do
+            for re in w:select "hitch_tag mesh_result draw_indirect eid:in render_object_visible?update bounding?update" do
                 -- render_object_visible only set in render_system entity_init by view_visible
                 re.render_object_visible = true
+                re.bounding.aabb       = mu.M3D_mark(re.bounding.aabb, math3d.aabb())
+                re.bounding.scene_aabb = mu.M3D_mark(re.bounding.scene_aabb, math3d.aabb())
                 glbs[#glbs+1] = { diid = re.eid}
                 update_instance_buffer(re.eid, memory, draw_num)
+            end
+            for re in w:select "hitch_tag efk render_object_visible?update view_visible?update" do
+                ivs.set_state(re, "efk_queue", true)
             end
             indirect_draw_group.glbs = glbs
             create_compute_entity(indirect_draw_group.glbs, memory, draw_num)
