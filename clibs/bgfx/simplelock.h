@@ -41,54 +41,61 @@ typedef int spinlock_t;
 
 /* read write lock */
 
+// 定义一个结构体 rwlock，用于实现读写锁
 struct rwlock {
-	int write;
-	int read;
+    int write; // 标识是否有写操作正在进行，非零表示有写锁被占用
+    int read;  // 记录当前持有读锁的线程数量
 };
 
+// 初始化读写锁结构体
 static inline void
 rwlock_init(struct rwlock *lock) {
-	lock->write = 0;
-	lock->read = 0;
+    lock->write = 0; // 将写操作标志位初始化为 0，表示没有写操作正在进行
+    lock->read = 0;  // 将读操作标志位初始化为 0，表示没有线程持有读锁
 }
 
+// 销毁读写锁结构体（实际上这个函数什么也不做）
 static inline void
 rwlock_destory(struct rwlock *lock) {
-	(void)lock;
-	// to nothing
+    (void)lock; // 忽略参数 lock，表示不使用这个参数
+    // 什么也不做
 }
 
+// 获取读锁
 static inline void
 rwlock_rlock(struct rwlock *lock) {
-	for (;;) {
-		while(lock->write) {
-			atom_sync();
-		}
-		atom_inc(&lock->read);
-		if (lock->write) {
-			atom_dec(&lock->read);
-		} else {
-			break;
-		}
-	}
+    for (;;) { // 无限循环，直到成功获取读锁为止
+        while(lock->write) { // 当有写锁被占用时，进入循环等待
+            atom_sync(); // 调用原子同步操作，可能是一种线程同步的机制
+        }
+        atom_inc(&lock->read); // 增加读锁计数
+        if (lock->write) { // 如果在增加读锁期间有写锁被占用
+            atom_dec(&lock->read); // 减少读锁计数
+        } else { // 如果没有写锁被占用
+            break; // 退出循环，表示成功获取读锁
+        }
+    }
 }
 
+// 获取写锁
 static inline void
 rwlock_wlock(struct rwlock *lock) {
-	atom_spinlock(&lock->write);
-	while(lock->read) {
-		atom_sync();
-	}
+    atom_spinlock(&lock->write); // 调用原子自旋锁操作，锁住写标志位，防止其他线程同时获取写锁
+    while(lock->read) { // 当有线程持有读锁时，进入循环等待
+        atom_sync(); // 调用原子同步操作，可能是一种线程同步的机制
+    }
 }
 
+// 释放写锁
 static inline void
 rwlock_wunlock(struct rwlock *lock) {
-	atom_spinunlock(&lock->write);
+    atom_spinunlock(&lock->write); // 调用原子自旋解锁操作，释放写标志位
 }
 
+// 释放读锁
 static inline void
 rwlock_runlock(struct rwlock *lock) {
-	atom_dec(&lock->read);
+    atom_dec(&lock->read); // 原子减操作，减少读锁计数
 }
 
 #endif
