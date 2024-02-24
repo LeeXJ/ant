@@ -69,3 +69,8 @@ int luabgfx_info(int64_t* psize) {
     *psize = allocator_memory;
     return 1;
 }
+
+// 这段 C++ 代码实现了以下功能：
+
+// 1. 自定义了一个内存分配器。
+// 2. 提供了函数用于获取内存分配器接口和获取当前内存使用量信息。
