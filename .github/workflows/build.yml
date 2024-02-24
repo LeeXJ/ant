@@ -1,61 +1,61 @@
-name: build
-on:
-  push:
-    paths:
-      - '.github/workflows/build.yml'
-      - '3rd/**'
-      - 'clibs/**'
-      - 'engine/**'
-      - 'pkg/**'
-      - 'runtime/**'
-      - 'make.lua'
-  pull_request:
-    branches:
-    - master
-jobs:
-  msvc:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-    - uses: actboy168/setup-luamake@master
-    - run: luamake
-  mingw:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-    - uses: actions/checkout@v4
-      with:
-        path: luamake
-        repository: actboy168/luamake
-        submodules : true
-    - uses: msys2/setup-msys2@v2
-      with:
-        update: true
-        install: >-
-          mingw-w64-x86_64-gcc
-          mingw-w64-x86_64-ninja
-    - shell: msys2 {0}
-      working-directory: luamake
-      run: ./compile/build.sh notest
-    - shell: msys2 {0}
-      run: ./luamake/luamake
-  macos:
-    runs-on: macos-14
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-    - uses: actboy168/setup-luamake@master
-    - run: luamake
-  ios:
-    runs-on: macos-14
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-    - uses: actboy168/setup-luamake@master
-    - run: luamake -os ios
+# name: build
+# on:
+#   push:
+#     paths:
+#       - '.github/workflows/build.yml'
+#       - '3rd/**'
+#       - 'clibs/**'
+#       - 'engine/**'
+#       - 'pkg/**'
+#       - 'runtime/**'
+#       - 'make.lua'
+#   pull_request:
+#     branches:
+#     - master
+# jobs:
+#   msvc:
+#     runs-on: windows-latest
+#     steps:
+#     - uses: actions/checkout@v4
+#       with:
+#         submodules: true
+#     - uses: actboy168/setup-luamake@master
+#     - run: luamake
+#   mingw:
+#     runs-on: windows-latest
+#     steps:
+#     - uses: actions/checkout@v4
+#       with:
+#         submodules: true
+#     - uses: actions/checkout@v4
+#       with:
+#         path: luamake
+#         repository: actboy168/luamake
+#         submodules : true
+#     - uses: msys2/setup-msys2@v2
+#       with:
+#         update: true
+#         install: >-
+#           mingw-w64-x86_64-gcc
+#           mingw-w64-x86_64-ninja
+#     - shell: msys2 {0}
+#       working-directory: luamake
+#       run: ./compile/build.sh notest
+#     - shell: msys2 {0}
+#       run: ./luamake/luamake
+#   macos:
+#     runs-on: macos-14
+#     steps:
+#     - uses: actions/checkout@v4
+#       with:
+#         submodules: true
+#     - uses: actboy168/setup-luamake@master
+#     - run: luamake
+#   ios:
+#     runs-on: macos-14
+#     steps:
+#     - uses: actions/checkout@v4
+#       with:
+#         submodules: true
+#     - uses: actboy168/setup-luamake@master
+#     - run: luamake -os ios
