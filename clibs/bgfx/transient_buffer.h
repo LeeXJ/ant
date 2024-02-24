@@ -15,3 +15,6 @@ struct transient_buffer {
 typedef int (*lua_TBFunction)(lua_State *L, struct transient_buffer *tb);
 
 #endif
+
+// 该头文件定义了一个用于存储临时顶点缓冲和索引缓冲信息的结构体，
+// 并提供了一个函数指针类型用于定义操作该结构体的 Lua 函数。

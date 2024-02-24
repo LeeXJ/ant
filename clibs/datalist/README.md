@@ -1,21 +1,22 @@
-## datalist
+## 数据列表
 
-A data format used by our game engine. It's just like a simpler version of yaml, or an enhanced version of json. 
+这是我们游戏引擎使用的一种数据格式。它类似于更简单的 YAML 或者增强版的 JSON。
 
-### A simple dictionary
-key should be a string without space, use : or = to separate value.
+### 简单字典
+
+键应为不带空格的字符串，可以使用 `:` 或 `=` 来分隔值。
 
 ```lua
 a = datalist.parse [[
-x : 1 # comments ...
-y = 2 # = is equivalent to :
+x : 1 # 注释 ...
+y = 2 # = 等同于 :
 100 : number
 ]]
 
 -- a = { x = 1, y = 2, ["100"] = "number" }
 ```
 
-Or you can use datalist.parse_list to parse dictionary into a list with key value pairs.
+或者您可以使用 `datalist.parse_list` 将字典解析为带有键值对的列表。
 ```lua
 a = datalist.parse_list [[
 x : 1
@@ -25,14 +26,15 @@ y : 2
 -- a = { x , 1, y , 2 }
 ```
 
-### A simple list
-Use white space ( space, tab, cr, newline , etc) to separate atoms.
+### 简单列表
+
+使用空格（空格、制表符、回车、换行等）来分隔元素。
 ```lua
 a = datalist.parse[[
 hello "world"
-0x1p+0 # hex float 1.0
+0x1p+0 # 十六进制浮点数 1.0
 2 
-0x3 # hex integer
+0x3 # 十六进制整数
 nil
 true 
 false
@@ -45,8 +47,9 @@ no  # false
 -- a = { "hello", "world", 1.0, 2, 3, nil, true, false, true, false, true, false }
 ```
 
-### section list
---- can be used to separate sections of a list.
+### 分节列表
+
+`---` 可以用来分隔列表的不同部分。
 ```lua
 a = datalist.parse [[
 ---
@@ -59,7 +62,7 @@ y : world
 -- a = { { x = "hello", y = "world" }, { 1,2,3 } }
 ```
 
-### Use indent or {} to describe a multilayer structure
+### 使用缩进或 `{}` 来描述多层结构
 
 ```lua
 a = datalist.parse [[
@@ -83,24 +86,24 @@ hello world
 -- a = { "hello", "world", { x = 1, y = 2 } }
 ```
 
-### Use tag to reference a structure
+### 使用标签引用结构
 
-tag is a 64bit hex integer id.
+标签是一个 64 位十六进制整数 ID。
 
 ```lua
 a = datalist.parse [[
---- &1   # This structure tagged by 1
+--- &1   # 用 1 标记了这个结构
 "hello\nworld"
 ---
-x : *1   # The value is the structure with tag 1
+x : *1   # 值是标记为 1 的结构
 ]]
 
 -- a = { { "hello\nworld" } , { x = { "hello\nworld" } } }
 ```
 
-### Converter
+### 转换器
 
-The structure in [] would be convert by a user function.
+方括号中的结构将由用户函数转换。
 
 ```lua
 a = datalist.parse( "[ 1, 2, 3 ]" , function (t)
