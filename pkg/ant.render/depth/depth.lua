@@ -9,7 +9,7 @@ if setting:get "graphic/disable_pre_z" then
 end
 
 local bgfx          = require "bgfx"
-local idi           = ecs.require "ant.render|draw_indirect.draw_indirect"
+local irender       = ecs.require "ant.render|render"
 local queuemgr      = ecs.require "queue_mgr"
 
 local R             = world:clibs "render.render_material"
@@ -56,36 +56,6 @@ function s:data_changed()
     end
 end
 
-local NO_DEPTH_TEST_STATES<const> = {
-    NEVER = true, ALWAYS = true, NONE = true
-}
-
-local function has_depth_test(dt)
-    if dt then
-        return not NO_DEPTH_TEST_STATES[dt]
-    end
-    return false
-end
-
-local function get_depth_state()
-    return {
-        ALPHA_REF   = 0,
-        CULL        = "CCW",
-        MSAA        = true,
-        WRITE_MASK  = "Z",
-    }
-end
-
-local function create_depth_state(originstate)
-    local s = bgfx.parse_state(originstate)
-    if has_depth_test(s.DEPTH_TEST) then
-        local d = get_depth_state()
-        d.PT, d.CULL = s.PT, s.CULL
-        d.DEPTH_TEST = "GREATER"
-        return bgfx.make_state(d)
-    end
-end
-
 function s:entity_ready()
     for e in w:select "filter_result visible_state:in render_layer:in material:in" do
         if e.visible_state["pre_depth_queue"] and irl.is_opacity_layer(e.render_layer) then
@@ -95,7 +65,7 @@ function s:entity_ready()
                 local fm = e.filter_material
                 local m = which_material(e, matres)
                 local Dmi = fm.DEFAULT_MATERIAL
-                local newstate = create_depth_state(Dmi:get_state())
+                local newstate = irender.create_depth_state(Dmi:get_state())
                 if newstate then
                     local mi = RM.create_instance(m.depth.object)
                     mi:set_state(newstate)

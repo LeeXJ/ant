@@ -9,6 +9,8 @@ local util  = ecs.require "util"
 local PC    = util.proxy_creator()
 local iom   = ecs.require "ant.objcontroller|obj_motion"
 local ig    = ecs.require "ant.group|group"
+local ivs   = ecs.require "ant.render|visible_state"
+
 local hn_test_sys = common.test_system "hitch_node"
 
 local h1, h2, h3
@@ -30,7 +32,7 @@ local function create_simple_test_group()
             visible_state = "main_view|cast_shadow|selectable",
             receive_shadow = true,
             cast_shadow = true,
-            hitch_create = TEST_INDIRECT,
+            hitch_update = TEST_INDIRECT,
         }
     }
     h2 = PC:create_entity {
@@ -47,7 +49,7 @@ local function create_simple_test_group()
             receive_shadow = true,
             cast_shadow = true,
             visible_state = "main_view|cast_shadow|selectable",
-            hitch_create = TEST_INDIRECT,
+            hitch_update = TEST_INDIRECT,
         }
     }
 
@@ -80,6 +82,7 @@ function hn_test_sys:init()
     PC:add_entity(util.create_shadow_plane(25))
 end
 
+local visible = true
 local key_mb = world:sub {"keyboard"}
 function hn_test_sys:data_changed()
     for _, key, press in key_mb:unpack() do
@@ -104,6 +107,10 @@ function hn_test_sys:data_changed()
                     visible_state = "main_view",
                 }
             }
+        elseif key == "Y" and press == 0 then
+            local he = world:entity(h1, "visible_state:in")
+            visible = not visible
+            ivs.set_state(he, "main_view|selectable|cast_shadow", visible)
         end
     end
 

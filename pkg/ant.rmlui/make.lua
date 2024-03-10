@@ -23,12 +23,16 @@ lm:source_set "stylecache" {
 }
 
 lm:lua_source "rmlui_core" {
+    confs = { "glm" },
     includes = {
         "src",
-        lm.AntDir .. "/3rd/glm",
+        lm.AntDir .. "/3rd/bgfx/include",
+        lm.AntDir .. "/3rd/bx/include",
+        lm.AntDir .. "/3rd/bgfx/3rdparty",
         lm.AntDir .. "/3rd/yoga",
         lm.AntDir .. "/3rd/bee.lua",
         lm.AntDir .. "/clibs/luabind",
+        lm.AntDir .. "/pkg/ant.resource_manager/src/"
     },
     defines = {
         lm.mode == "debug" and "DEBUG",
@@ -40,9 +44,9 @@ lm:lua_source "rmlui_core" {
 }
 
 lm:lua_source "rmlui_css" {
+    confs = { "glm" },
     includes = {
         "src",
-        lm.AntDir .. "/3rd/glm",
         lm.AntDir .. "/3rd/yoga",
         lm.AntDir .. "/3rd/stylecache",
         lm.AntDir .. "/3rd/bee.lua",
@@ -57,12 +61,12 @@ lm:lua_source "rmlui_css" {
 }
 
 lm:lua_source "rmlui_binding" {
+    confs = { "glm" },
     includes = {
         "src",
         lm.AntDir .. "/3rd/bgfx/include",
         lm.AntDir .. "/3rd/bx/include",
         lm.AntDir .. "/3rd/bgfx/3rdparty",
-        lm.AntDir .. "/3rd/glm",
         lm.AntDir .. "/3rd/yoga",
         lm.AntDir .. "/3rd/bee.lua",
         lm.AntDir .. "/clibs/luabind",

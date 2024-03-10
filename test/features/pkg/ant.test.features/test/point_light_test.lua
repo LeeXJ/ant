@@ -8,7 +8,7 @@ local util      = ecs.require "util"
 local PC        = util.proxy_creator()
 local imesh     = ecs.require "ant.asset|mesh"
 local ientity 	= ecs.require "ant.entity|entity"
-local imaterial = ecs.require "ant.asset|material"
+local imaterial = ecs.require "ant.render|material"
 
 local math3d    = require "math3d"
 
@@ -51,7 +51,7 @@ function plt_sys.init_world()
             },
 			material 	= "/pkg/ant.resources/materials/mesh_shadow.material",
 			visible_state= "main_view",
-			simplemesh 	= imesh.init_mesh(ientity.plane_mesh()),
+			mesh_result	= imesh.init_mesh(ientity.plane_mesh()),
 		}
 	}
 

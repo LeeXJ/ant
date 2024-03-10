@@ -9,7 +9,7 @@ local iani      = ecs.require "ant.anim_ctrl|state_machine"
 local timer     = ecs.require "ant.timer|timer_system"
 local iom       = ecs.require "ant.objcontroller|obj_motion"
 local ika       = ecs.require "ant.anim_ctrl|keyframe"
-local imaterial = ecs.require "ant.asset|material"
+local imaterial = ecs.require "ant.render|material"
 local mathpkg	= import_package "ant.math"
 local aio       = import_package "ant.io"
 local mc	    = mathpkg.constant
@@ -42,13 +42,26 @@ function modifier_sys:start_frame()
         ::continue::
     end
 end
+
+function modifier_sys:component_init()
+    for e in w:select "INIT modifier:update scene:in" do
+        local ae <close> = world:entity(e.scene.parent, "animation?in")
+        if ae and ae.animation then
+            e.modifier.animation = ae.animation
+            e.modifier.bone_index = ae.animation.skeleton:joint_index(e.modifier[1])
+        end
+    end
+end
+
 function modifier_sys:update_modifier()
     local delta_time = timer.delta() * 0.001
     local to_destroy = {}
     for e in w:select "modifier:in eid:in" do
-        local destroy = e.modifier:update(delta_time)
-        if destroy then
-            to_destroy[#to_destroy + 1] = e.eid
+        if e.modifier.update then
+            local destroy = e.modifier:update(delta_time)
+            if destroy then
+                to_destroy[#to_destroy + 1] = e.eid
+            end
         end
     end
     for _, eid in ipairs(to_destroy) do
@@ -60,6 +73,17 @@ function modifier_sys:update_modifier()
     end
 end
 
+function modifier_sys:finish_scene_update()
+    for e in w:select "modifier:in render_object:update scene:in" do
+        if not e.modifier.update and e.modifier.animation then
+            local pe <close> = world:entity(e.scene.parent, "scene:in animation?in")
+            local models = e.modifier.animation.models
+            local parent_bone_mat = math3d.array_index(math3d.array_matrix_ref(models:pointer(), models:count()), e.modifier.bone_index)
+            local bone_srt = math3d.matrix(e.scene)
+            e.render_object.worldmat = math3d.mul(pe.scene.worldmat, math3d.mul(mc.R2L_MAT, math3d.mul(parent_bone_mat, math3d.mul(mc.R2L_MAT, bone_srt))))
+        end
+    end
+end
 
 function modifier_sys:entity_ready()
 
@@ -170,10 +194,13 @@ function imodifier.create_mtl_modifier(target, property, keyframes, keep, foreup
                     end
                     local e <close> = world:entity(self.target)
                     if not e then
-                        return
+                        return true
                     end
                     imaterial.set_property(e, self.property, apply_value)
                     self.continue = running
+                    if not running and self.destroy then
+                        return true
+                    end
                 end
             }
         }
@@ -404,7 +431,6 @@ function imodifier.create_bone_modifier(target, group_id, filename, bone_name)
                 if anim.animation then
                     local models = anim.animation.models
                     return math3d.array_index(math3d.array_matrix_ref(models:pointer(), models:count()), anim.animation.skeleton:joint_index(bone_name)), anim.animation_playback
-                    -- return anim.animation.models:joint(anim.animation.skeleton:joint_index(bone_name)), anim.animation_playback
                 end
             end
         end)

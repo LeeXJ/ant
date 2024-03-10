@@ -8,7 +8,7 @@ local irender   = ecs.require "ant.render|render"
 local renderpkg = import_package "ant.render"
 local layoutmgr = renderpkg.layoutmgr
 local layout    = layoutmgr.get "p3|t20"
-local imaterial = ecs.require "ant.asset|material"
+local imaterial = ecs.require "ant.render|material"
 local tp_sys    = ecs.system 'translucent_plane_system'
 
 local DEFAULT_TP_RENDER_LAYER <const> = "translucent"
@@ -83,7 +83,7 @@ local function create_tp_entity(info, render_layer, tile_size, material)
         },
         data = {
             scene = {s = {info.w, 1, info.h}, t = {info.x, 0, info.y}},
-            simplemesh  = mesh,
+            mesh_result = mesh,
             material    = material,
             visible_state = "main_view|selectable",
             render_layer = render_layer,

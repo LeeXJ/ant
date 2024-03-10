@@ -595,11 +595,51 @@ lRenderFrame(lua_State* L) {
 
 static int
 lRenderSetTexture(lua_State* L) {
-	Rml::TextureData data;
+	Rml::TextureData* data = new Rml::TextureData();
 	if (lua_gettop(L) >= 4) {
-		data.handle = (Rml::TextureId)luaL_checkinteger(L, 2);
-		data.dimensions.w = (float)luaL_checkinteger(L, 3);
-		data.dimensions.h = (float)luaL_checkinteger(L, 4);
+		data->handle = (Rml::TextureId)luaL_checkinteger(L, 2);
+		data->dimensions.w = (float)luaL_checkinteger(L, 3);
+		data->dimensions.h = (float)luaL_checkinteger(L, 4);
+	}
+	Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(data));
+    return 0;
+}
+
+static int
+lRenderSetLatticeTexture(lua_State* L) {
+	Rml::LatticeData* data = new Rml::LatticeData();
+	if (lua_gettop(L) >= 10) {
+		data->handle       = (Rml::TextureId)luaL_checkinteger(L, 2);
+		data->dimensions.w = (float)luaL_checkinteger(L, 3);
+		data->dimensions.h = (float)luaL_checkinteger(L, 4);
+		data->lattice.x1   = (float)luaL_checknumber(L, 5);
+		data->lattice.y1   = (float)luaL_checknumber(L, 6);
+		data->lattice.x2   = (float)luaL_checknumber(L, 7);
+		data->lattice.y2   = (float)luaL_checknumber(L, 8);
+		data->lattice.u    = (float)luaL_checknumber(L, 9);
+		data->lattice.v    = (float)luaL_checknumber(L, 10);
+		Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(data));
+	}
+	Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(data));
+    return 0;
+}
+
+static int
+lRenderSetTextureAtlas(lua_State* L) {
+	Rml::AtlasData* data = new Rml::AtlasData();
+	if (lua_gettop(L) >= 12) {
+		data->handle           = (Rml::TextureId)luaL_checkinteger(L, 2);
+		data->dimensions.w     = (float)luaL_checkinteger(L, 3);
+		data->dimensions.h     = (float)luaL_checkinteger(L, 4);
+		data->uv_rect.origin.x   = (float)luaL_checknumber(L, 5);
+		data->uv_rect.origin.y   = (float)luaL_checknumber(L, 6);
+		data->uv_rect.size.w     = (float)luaL_checknumber(L, 7);
+		data->uv_rect.size.h     = (float)luaL_checknumber(L, 8);
+		data->vertex_factor.origin.x = (float)luaL_optnumber(L, 9, 0);
+		data->vertex_factor.origin.y = (float)luaL_optnumber(L, 10, 0);
+		data->vertex_factor.size.w   = (float)luaL_optnumber(L, 11, 1);
+		data->vertex_factor.size.h   = (float)luaL_optnumber(L, 12, 11);
+		Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(data));
 	}
 	Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(data));
     return 0;
@@ -672,6 +712,8 @@ luaopen_rmlui(lua_State* L) {
 		{ "RenderBegin", lRenderBegin },
 		{ "RenderFrame", lRenderFrame },
 		{ "RenderSetTexture", lRenderSetTexture },
+		{ "RenderSetLatticeTexture", lRenderSetLatticeTexture },
+		{ "RenderSetTextureAtlas", lRenderSetTextureAtlas },
 		{ "RmlInitialise", lRmlInitialise },
 		{ "RmlShutdown", lRmlShutdown },
 		{ NULL, NULL },

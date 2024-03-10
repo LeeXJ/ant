@@ -2,6 +2,11 @@ local ecs   = ...
 local world = ecs.world
 local w     = world.w
 
+--disable
+if true then
+    return
+end
+
 local setting       = import_package "ant.settings"
 local hwi           = import_package "ant.hwi"
 local mu            = import_package "ant.math".util
@@ -12,15 +17,15 @@ local bgfx          = require "bgfx"
 local math3d        = require "math3d"
 local queuemgr      = ecs.require "queue_mgr"
 local util          = ecs.require "postprocess.util"
-local imaterial     = ecs.require "ant.asset|material"
+local imaterial     = ecs.require "ant.render|material"
 local irender       = ecs.require "ant.render|render"
 local irq           = ecs.require "ant.render|render_system.renderqueue"
 local icompute      = ecs.require "ant.render|compute.compute"
 local iviewport     = ecs.require "ant.render|viewport.state"
 local layoutmgr     = renderpkg.layoutmgr
 local layout        = layoutmgr.get "p3|t20"
-local scene_ratio   = irender.get_framebuffer_ratio("scene_ratio")
-local NEED_UPSACLE <const>   = scene_ratio >= 0.5 and scene_ratio < 1
+assert(false, "Not work right now")
+local NEED_UPSACLE <const>   = false
 local ENABLE_FXAA  <const>   = setting:get "graphic/postprocess/fxaa/enable"
 local ENABLE_TAA   <const>   = setting:get "graphic/postprocess/taa/enable"
 local ENABLE_FSR   <const>   = setting:get "graphic/postprocess/fsr/enable" and (ENABLE_FXAA or ENABLE_TAA) and NEED_UPSACLE
@@ -157,7 +162,7 @@ local function create_fsr_resolve_entity(ratio)
             "ant.render|simplerender",
         },
         data = {
-            simplemesh          = to_mesh_buffer(vb, irender.quad_ib()),
+            mesh_result         = to_mesh_buffer(vb, irender.quad_ib()),
             material            = "/pkg/ant.resources/materials/postprocess/fsr_resolve.material",
             visible_state       = "fsr_resolve_queue",
             fsr_resolve_drawer  = true,

@@ -9,7 +9,7 @@ local PC    = util.proxy_creator()
 local irl       = ecs.require "ant.render|render_layer.render_layer"
 local ientity   = ecs.require "ant.entity|entity"
 local imesh     = ecs.require "ant.asset|mesh"
-local imaterial = ecs.require "ant.asset|material"
+local imaterial = ecs.require "ant.render|material"
 local iom       = ecs.require "ant.objcontroller|obj_motion"
 
 local math3d    = require "math3d"
@@ -35,20 +35,11 @@ function rlt_sys.init_world()
             "ant.render|simplerender",
         },
         data = {
-            simplemesh = ientity.plane_mesh(),
+            mesh_result= ientity.plane_mesh(),
             scene = {t = {-10, 0, 0}, s = 10},
             material = "/pkg/ant.test.features/assets/render_layer_test.material",
             render_layer = "translucent_plane",
             visible_state = "main_view",
-            on_ready = function (e)
-                imaterial.set_state(e, {
-                    ALPHA_REF = 0,
-                    CULL = "CCW",
-                    DEPTH_TEST = "GREATER",
-                    MSAA = true,
-                    WRITE_MASK = "RGBAZ"
-                })
-            end
         }
     }
 

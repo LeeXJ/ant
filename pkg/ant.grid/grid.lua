@@ -9,7 +9,7 @@ local layoutmgr = renderpkg.layoutmgr
 local bgfx      = require "bgfx"
 local math3d    = require "math3d"
 local irender   = ecs.require "ant.render|render"
-local imaterial = ecs.require "ant.asset|material"
+local imaterial = ecs.require "ant.render|material"
 
 local DEFAULT_GRID_MATERIAL <const> = "/pkg/ant.grid/assets/grid.material"
 local DEFAULT_GRID_COLOR = math3d.ref(math3d.vector(1.0, 1.0, 1.0, 1.0))
@@ -73,7 +73,7 @@ local function create_grid_entity(grid_params, grid_color, grid_render_layer, gr
         },
         data = {
             scene = grid_srt,
-            simplemesh  = DEFAULT_GRID_MESH and DEFAULT_GRID_MESH or get_quad_mesh(),
+            mesh_result = DEFAULT_GRID_MESH or get_quad_mesh(),
             material    = DEFAULT_GRID_MATERIAL,
             visible_state = "main_view|selectable",
             render_layer = grid_render_layer,

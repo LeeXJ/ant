@@ -332,12 +332,24 @@ function irender.align_buffer(s, alignsize)
     return s
 end
 
-function irender.set_framebuffer_ratio(which, ratio)
-	world:pub{"framebuffer_ratio_changed", which, ratio}
+local NO_DEPTH_TEST_STATES<const> = {
+    NEVER = true, ALWAYS = true, NONE = true
+}
+
+function irender.has_depth_test(s)
+	local ss = bgfx.parse_state(s)
+	if ss.DEPTH_TEST and not NO_DEPTH_TEST_STATES[ss.DEPTH_TEST] then
+        return ss
+    end
 end
 
-function irender.get_framebuffer_ratio(which)
-	return iviewport[which] or error ("Invalid ratio type:" .. which)
+function irender.create_depth_state(os)
+    local s = irender.has_depth_test(os)
+    if s and not s.BLEND then
+        s.DEPTH_TEST = "GREATER"
+		s.WRITE_MASK = "Z"
+        return bgfx.make_state(s)
+    end
 end
 
 function irender.group_flush(go)

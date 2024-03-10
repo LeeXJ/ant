@@ -18,7 +18,7 @@ local Q			= world:clibs "render.queue"
 local queuemgr	= ecs.require "queue_mgr"
 
 local irender	= ecs.require "ant.render|render"
-local imaterial = ecs.require "ant.asset|material"
+local imaterial = ecs.require "ant.render|material"
 local imesh		= ecs.require "ant.asset|mesh"
 local itimer	= ecs.require "ant.timer|timer_system"
 local irl		= ecs.require "ant.render|render_layer.render_layer"
@@ -131,10 +131,6 @@ local function update_visible_masks(e)
 	end
 end
 
-function render_sys:init()
-	assert(imaterial.default_material_index() == queuemgr.default_material_index())
-end
-
 local function create_material_instance(e)
 	--TODO: add render_features flag to replace skinning and draw_indirect component check
 	w:extend(e, "draw_indirect?in")
@@ -160,24 +156,30 @@ local function update_default_material_index(e)
 end
 
 local function check_set_depth_state_as_equal(state)
-	local ss = bgfx.parse_state(state)
-	ss.DEPTH_TEST = "EQUAL"
-	local wm = ss.WRITE_MASK
-	ss.WRITE_MASK = wm and wm:gsub("Z", "") or "RGBA"
-	return bgfx.make_state(ss)
+	local ss = irender.has_depth_test(state)
+	if ss and not ss.BLEND then
+		ss.DEPTH_TEST = "EQUAL"
+		if ss.WRITE_MASK then
+			ss.WRITE_MASK = ss.WRITE_MASK:gsub("Z", "")
+		end
+		return bgfx.make_state(ss)
+	end
 end
 
 local function check_update_main_queue_material(e)
 	w:extend(e, "visible_state:in")
+	--TODO: bug here, when we init with render_layer which is opacity layer, then we changed it as not opacity layer, it will has wrong state
 	if ENABLE_PRE_DEPTH and e.visible_state["main_queue"] and irl.is_opacity_layer(assert(e.render_layer)) then
 		w:extend(e, "filter_material:in")
 		local fm = e.filter_material
 		local mr = assetmgr.resource(e.material)
 		local mi = fm.DEFAULT_MATERIAL
 		if not mr.fx.setting.no_predepth then
-			local nmi = create_material_instance(e)
-			nmi:set_state(check_set_depth_state_as_equal(mi:get_state()))
-			mi = nmi
+			local ns = check_set_depth_state_as_equal(mi:get_state())
+			if ns then
+				mi = create_material_instance(e)
+				mi:set_state(ns)
+			end
 		end
 
 		local midx = queuemgr.material_index "main_queue"
@@ -205,10 +207,6 @@ function render_sys:component_init()
 
 	for e in w:select "INIT mesh:in mesh_result?update" do
 		e.mesh_result = assetmgr.resource(e.mesh)
-	end
-
-	for e in w:select "INIT simplemesh:update mesh_result?update" do
-		e.mesh_result = e.simplemesh
 	end
 end
 
@@ -369,8 +367,8 @@ local function clear_render_object(ro)
 end
 
 function render_sys:entity_remove()
-	for e in w:select "REMOVED owned_mesh_buffer simplemesh:in" do
-		imesh.delete_mesh(e.simplemesh)
+	for e in w:select "REMOVED owned_mesh_buffer mesh_result:in" do
+		imesh.delete_mesh(e.mesh_result)
 	end
 
 	for e in w:select "REMOVED render_object:update filter_material:in" do

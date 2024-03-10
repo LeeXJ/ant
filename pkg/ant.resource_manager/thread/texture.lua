@@ -12,6 +12,16 @@ local mem_formats <const> = {
     RGBA32F = "ffff",
 }
 
+local function getTextureType(info)
+    if info.lattice then
+        return 1
+    elseif info.atlas then
+        return 2
+    else
+        return 0
+    end
+end
+
 local function createTexture(c)
     local h
     if c.value then
@@ -175,6 +185,7 @@ local createQueue = {}
 local destroyQueue = {}
 local unloadQueue = {}
 local token = {}
+local atlas = {}
 
 local function which_texture_type(info)
     if info.cubemap then
@@ -212,6 +223,9 @@ local function asyncLoadTexture(c)
         c.texinfo = textureData.info
         c.sampler = textureData.sampler
         c.lifespan = textureData.lifespan
+        if textureData.info.atlas and atlas[textureData.image] then
+            textureData.handle = atlas[textureData.image]
+        end
         asyncCreateTexture(c.name, textureData)
         loadQueue[c.id] = nil
         ltask.multi_wakeup(Token)
@@ -230,7 +244,7 @@ local function asyncDestroyTexture(c)
 	else
 	    destroyQueue[#destroyQueue+1] = c.handle
 	end
-    textureman.texture_set(c.id, DefaultTexture[c.type])
+    textureman.texture_set(c.id, DefaultTexture[c.type], getTextureType(c.texinfo))
     c.handle = nil
 end
 
@@ -258,8 +272,11 @@ ltask.fork(function ()
             local c = textureByName[name]
             local handle = textureData.handle or createTexture(textureData)
             c.handle = handle
+            if textureData.info.atlas and not (atlas[textureData.image]) then
+                atlas[textureData.image] = c.handle
+            end
             c.flag   = textureData.flag
-            textureman.texture_set(c.id, handle)
+            textureman.texture_set(c.id, handle, getTextureType(textureData.info))
             local block_token = blockQueue[name]
             if block_token then
                 blockQueue[name] = nil

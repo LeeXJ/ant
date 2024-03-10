@@ -13,7 +13,7 @@ local geolib    = geopkg.geometry
 local mathpkg   = import_package "ant.math"
 local mc		= mathpkg.constant
 
-local imaterial = ecs.require "ant.asset|material"
+local imaterial = ecs.require "ant.render|material"
 local irender	= ecs.require "ant.render|render"
 local imesh 	= ecs.require "ant.asset|mesh"
 local bgfx 		= require "bgfx"
@@ -78,7 +78,7 @@ local function simple_render_entity_data(material, mesh, scene, uniforms, hide, 
 		data = {
 			scene 		= scene or {},
 			material	= material,
-			simplemesh	= imesh.init_mesh(mesh, true),
+			mesh_result	= imesh.init_mesh(mesh, true),
 			render_layer= render_layer,
 			visible_state= visible_state,
 			on_ready 	= function(e)
@@ -108,7 +108,7 @@ local function grid_mesh_entity_data(materialpath, vb, ib, render_layer)
 			material 	= materialpath,
 			visible_state= "main_view",
 			render_layer= render_layer,
-			simplemesh	= imesh.init_mesh(create_dynamic_mesh("p3|c40niu", vb, ib), true), --create_mesh({"p3|c40niu", vb}, ib)
+			mesh_result	= imesh.init_mesh(create_dynamic_mesh("p3|c40niu", vb, ib), true), --create_mesh({"p3|c40niu", vb}, ib)
 		},
 	}
 end
@@ -240,7 +240,7 @@ function ientity.create_prim_plane_entity(materialpath, scene, color, hide, rend
 			material 	= materialpath,
 			visible_state= hide and "" or "main_view",
 			render_layer= render_layer,
-			simplemesh 	= create_mesh({"p3|n3", plane_vb}, nil, {{-0.5, 0, -0.5}, {0.5, 0, 0.5}}),
+			mesh_result 	= create_mesh({"p3|n3", plane_vb}, nil, {{-0.5, 0, -0.5}, {0.5, 0, 0.5}}),
 			on_ready = function (e)
 				imaterial.set_property(e, "u_color", math3d.vector(color))
 			end
@@ -248,14 +248,11 @@ function ientity.create_prim_plane_entity(materialpath, scene, color, hide, rend
 	}
 end
 
-local function quad_mesh(rect)
-	local origin_bottomleft = hwi.get_caps().originBottomLeft
-	local minv, maxv
-	if origin_bottomleft then
-		minv, maxv = 0, 1
-	else
-		minv, maxv = 1, 0
-	end
+local function quad_mesh(rect, xzplane, uvrect)
+	--assume uv are top left position
+	uvrect = uvrect or {
+		x=0, y=0, w=1, h=1,
+	}
 	local x, y, w, h
 	if rect then
 		x, y = rect.x or 0, rect.y or 0
@@ -264,11 +261,25 @@ local function quad_mesh(rect)
 		x, y = -1, -1
 		w, h = 2, 2
 	end
+
+	local x0, x1 = x, x+w
+	local y0, y1 = y, y+h
+	local u0, u1 = uvrect.x, uvrect.x+uvrect.w
+	local v0, v1 = uvrect.y, uvrect.x+uvrect.h
+
+	if xzplane then
+		return create_mesh({"p3|t2", {
+			x0,  0, y0, u0, v1,	--bottom left
+			x0,	 0, y1, u0, v0,	--top left
+			x1,  0, y0, u1, v1,	--bottom right
+			x1,  0, y1, u1, v0,	--top right
+		}})
+	end
 	return create_mesh({"p3|t2", {
-		x, 		y, 		0, 	0, minv,	--bottom left
-		x,		y + h, 	0, 	0, maxv,	--top left
-		x + w, 	y, 		0, 	1, minv,	--bottom right
-		x + w, 	y + h, 	0, 	1, maxv,	--top right
+		x0, y0, 0, u0, v1,	--bottom left
+		x0,	y1, 0, u0, v0,	--top left
+		x1, y0, 0, u1, v1,	--bottom right
+		x1, y1, 0, u1, v0,	--top right
 	}})
 end
 
@@ -282,12 +293,12 @@ end
 
 ientity.fullquad_mesh = fullquad_mesh
 
-function ientity.quad_mesh(rect)
+function ientity.quad_mesh(rect, xzplane, uvrect)
 	if rect == nil then
 		return fullquad_mesh()
 	end
 
-	return quad_mesh(rect)
+	return quad_mesh(rect, xzplane, uvrect)
 end
 
 function ientity.create_quad_entity(rect, material, render_layer)
@@ -361,7 +372,7 @@ function ientity.create_screen_axis_entity(screen_3dobj, scene, color)
 			scene 		= scene or {},
 			material	= "/pkg/ant.resources/materials/line.material",
 			render_layer= "translucent",
-			simplemesh	= imesh.init_mesh(mesh, true),
+			mesh_result	= imesh.init_mesh(mesh, true),
 			visible_state= "main_view",
 		}
 	}
@@ -474,7 +485,7 @@ function ientity.create_skybox(material)
 			},
 			skybox = {},
 			owned_mesh_buffer = true,
-			simplemesh = get_skybox_mesh(),
+			mesh_result = get_skybox_mesh(),
 		}
 	}
 end
@@ -542,7 +553,7 @@ function ientity.create_procedural_sky(settings)
 			visible_state = "main_view",
 			owned_mesh_buffer = true,
 			render_layer = "background",
-			simplemesh = create_sky_mesh(32, 32),
+			mesh_result = create_sky_mesh(32, 32),
 		}
 	}
 end
@@ -555,7 +566,7 @@ function ientity.create_gamma_test_entity()
         data = {
             material = "/pkg/ant.resources/materials/gamma_test.material",
 			render_layer = "translucent",
-            simplemesh = {
+            mesh_result = {
                 ib = {
                     start = 0,
                     num = 6,
@@ -689,7 +700,7 @@ function ientity.create_arrow_entity(headratio, color, material, scene)
 			"ant.render|simplerender",
 		},
 		data = {
-			simplemesh = arrow_mesh(headratio),
+			mesh_result = arrow_mesh(headratio),
 			material = material,
 			visible_state = "main_view",
 			scene = scene or {},
@@ -700,7 +711,7 @@ function ientity.create_arrow_entity(headratio, color, material, scene)
 	}
 end
 
-function ientity.create_quad_lines_entity(scene, material, quadnum, width, hide, render_layer)
+function ientity.create_quad_lines_entity(scene, material, quadnum, width, hide, render_layer, on_ready)
     assert(quadnum > 0)
     local hw = width * 0.5
     local function create_vertex_buffer()
@@ -750,9 +761,24 @@ function ientity.create_quad_lines_entity(scene, material, quadnum, width, hide,
         data = {
 			scene = scene or {},
 			visible_state = hide and "" or "main_view",
-            simplemesh = create_mesh(create_vertex_buffer(), create_index_buffer()),
+            mesh_result = create_mesh(create_vertex_buffer(), create_index_buffer()),
 			material = material,
 			render_layer = render_layer,
+			on_ready = on_ready,
+        }
+    }
+end
+
+function ientity.create_quad_entity(material, srt, rect, uvrect)
+    return world:create_entity{
+        policy = {"ant.render|simplerender",},
+        data = {
+            material 	= material,
+            mesh_result = ientity.quad_mesh(rect, true, uvrect),
+            owned_mesh_buffer = true,
+            visible_state = "main_view",
+            scene 		= srt,
+            render_layer= "translucent",
         }
     }
 end

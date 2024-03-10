@@ -10,7 +10,7 @@ local ivs 		= ecs.require "ant.render|visible_state"
 local ientity 	= ecs.require "ant.entity|entity"
 local ilight 	= ecs.require "ant.render|light.light"
 local irq		= ecs.require "ant.render|render_system.renderqueue"
-local imaterial = ecs.require "ant.asset|material"
+local imaterial = ecs.require "ant.render|material"
 local imodifier = ecs.require "ant.modifier|modifier"
 local prefab_mgr = ecs.require "prefab_manager"
 local iviewport = ecs.require "ant.render|viewport.state"
@@ -35,7 +35,7 @@ local uniform_scale = false
 local local_space = false
 
 local function cvt2scenept(x, y)
-    return x - iviewport.device_size.x, y - iviewport.device_size.y
+    return x - iviewport.device_viewrect.x, y - iviewport.device_viewrect.y
 end
 
 function gizmo:update()

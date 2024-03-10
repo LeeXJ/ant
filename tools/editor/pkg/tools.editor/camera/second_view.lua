@@ -16,7 +16,7 @@ local math3d    = require "math3d"
 local irq       = ecs.require "ant.render|render_system.renderqueue"
 local queuemgr  = ecs.require "ant.render|queue_mgr"
 local icamera   = ecs.require "ant.camera|camera"
-local imaterial = ecs.require "ant.asset|material"
+local imaterial = ecs.require "ant.render|material"
 local ientity   = ecs.require "ant.entity|entity"
 
 local second_camera_sys = ecs.system "second_view_camera_system"
@@ -189,7 +189,7 @@ local function create_frustum_entity(eid)
         },
         data = {
             on_ready = onready,
-            simplemesh = ientity.create_mesh({"p3", vb}, frustum_ib),
+            mesh_result = ientity.create_mesh({"p3", vb}, frustum_ib),
             owned_mesh_buffer = true,
             material = "/pkg/ant.resources/materials/line_color.material",
             render_layer = "translucent",
@@ -212,7 +212,7 @@ local function create_frustum_entity(eid)
             "ant.render|simplerender",
         },
         data = {
-            simplemesh = ientity.create_mesh{
+            mesh_result = ientity.create_mesh{
                 "p3",{
                     -hl, 0.0, 0.0,
                     0.0, h,   0.0,

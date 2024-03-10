@@ -57,8 +57,15 @@ function m:init_world()
     iRmlUi.open "/pkg/tools.editor/resource/ui/bgfx_stat.html"
 end
 
+local aabb_color_i <const> = 0x6060ffff
+local highlight_aabb = {
+    visible = false,
+    min = nil,
+    max = nil,
+}
+
 local event_ui_layout = world:sub {"UILayout"}
-function m:ui_update()
+function m:data_changed()
     for _, action in event_ui_layout:unpack() do
         if action == "save" then
             widget_utils.save_ui_layout()
@@ -86,14 +93,11 @@ function m:ui_update()
     local bgfxstat = bgfx.get_stats "sdcpnmtv"
     iRmlUi.sendMessage("stat", string.format("DC: %d\nTri: %d\nTex: %d\ncpu(ms): %.2f\ngpu(ms): %.2f\nfps: %d", 
                             bgfxstat.numDraw, bgfxstat.numTriList, bgfxstat.numTextures, bgfxstat.cpu, bgfxstat.gpu, bgfxstat.fps))
+    if highlight_aabb.visible and highlight_aabb.min and highlight_aabb.max then
+        iwd.draw_aabb_box(highlight_aabb, nil, aabb_color_i)
+        -- iwd.draw_lines({0.0,0.0,0.0,0.0,10.0,0.0}, nil, aabb_color_i)
+    end
 end
-
-local aabb_color_i <const> = 0x6060ffff
-local highlight_aabb = {
-    visible = false,
-    min = nil,
-    max = nil,
-}
 
 local function update_highlight_aabb(eid)
     local visible = false
@@ -293,17 +297,10 @@ function m:handle_event()
     resource_browser:handle_event()
 end
 
-function m:data_changed()
-    if highlight_aabb.visible and highlight_aabb.min and highlight_aabb.max then
-        iwd.draw_aabb_box(highlight_aabb, nil, aabb_color_i)
-        -- iwd.draw_lines({0.0,0.0,0.0,0.0,10.0,0.0}, nil, aabb_color_i)
-    end
-end
-
 function m:widget()
 end
 
-function m.end_animation()
+function m.update_modifier()
     joint_utils:update_pose(prefab_mgr:get_root_mat() or math3d.matrix{})
     keyframe_view.end_animation()
 end

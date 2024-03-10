@@ -14,16 +14,13 @@ local fbmgr         = require "framebuffer_mgr"
 
 local util          = ecs.require "postprocess.util"
 local queuemgr      = ecs.require "queue_mgr"
-local imaterial     = ecs.require "ant.asset|material"
+local imaterial     = ecs.require "ant.render|material"
 local irender       = ecs.require "ant.render|render"
 local irq           = ecs.require "ant.render|render_system.renderqueue"
 local ifsr          = ecs.require "ant.render|postprocess.fsr"
 local iviewport     = ecs.require "ant.render|viewport.state"
 
-local scene_ratio   = irender.get_framebuffer_ratio("scene_ratio")
-local NEED_UPSACLE <const>   = scene_ratio >= 0.5 and scene_ratio < 1
-local ENABLE_FSR   <const>   = setting:get "graphic/postprocess/fsr/enable" and (ENABLE_FXAA or ENABLE_TAA) and NEED_UPSACLE
---local ENABLE_FSR   <const>   = nil
+local ENABLE_FSR   <const>   = setting:get "graphic/postprocess/fsr/enable" and (ENABLE_FXAA or ENABLE_TAA)
 
 local swapchain_viewid<const> = hwi.viewid_get "swapchain"
 local RENDER_ARG
@@ -33,7 +30,7 @@ local function register_queue()
     queuemgr.register_queue "swapchain_queue"
     RENDER_ARG = irender.pack_render_arg("swapchain_queue", swapchain_viewid)
 
-    util.create_queue(swapchain_viewid, mu.copy_viewrect(iviewport.device_size), nil, "swapchain_queue", "swapchain_queue")
+    util.create_queue(swapchain_viewid, mu.copy_viewrect(iviewport.device_viewrect), nil, "swapchain_queue", "swapchain_queue")
 end
 
 function sc_sys:init()
@@ -43,10 +40,10 @@ function sc_sys:init()
             "ant.render|simplerender",
         },
         data = {
-            simplemesh       = irender.full_quad(),
-            material         = "/pkg/ant.resources/materials/postprocess/swapchain.material",
-            visible_state    = "swapchain_queue",
-            scene            = {},
+            mesh_result  = irender.full_quad(),
+            material     = "/pkg/ant.resources/materials/postprocess/swapchain.material",
+            visible_state= "swapchain_queue",
+            scene        = {},
         }
     }
 end
@@ -54,8 +51,8 @@ end
 local scene_viewrect_changed_mb = world:sub{"scene_viewrect_changed"}
 
 function sc_sys:data_changed()
-    for _, vr in scene_viewrect_changed_mb:unpack() do
-        irq.set_view_rect("swapchain_queue", iviewport.device_size)
+    for _, _ in scene_viewrect_changed_mb:unpack() do
+        irq.set_view_rect("swapchain_queue", iviewport.device_viewrect)
         break
     end
 end

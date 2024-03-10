@@ -1,7 +1,7 @@
 local ltask         = require "ltask"
-local exclusive     = require "ltask.exclusive"
 local bgfx          = require "bgfx"
 local platform      = require "bee.platform"
+local thread        = require "bee.thread"
 local fontmanager
 local cell = import_package "ant.textcell"
 
@@ -24,10 +24,8 @@ local CALL = {
     "fontmanager",
     "fontimport",
     "show_profile",
-    "event_suspend",
-
-    "fetch_world_camera",
-    "update_world_camera",
+    "pause",
+    "continue",
 }
 
 local SEND = {
@@ -190,9 +188,12 @@ function S.encoder_destroy()
     local who = ltask.current_session().from
     if encoder[who] == encoder_frame then
         encoder_cur = encoder_cur - 1
+        ltask.wakeup "encoder"
     end
     encoder[who] = nil
+    profile[who] = nil
     encoder_num = encoder_num - 1
+    ltask.wakeup "encoder"
 end
 
 function S.encoder_frame()
@@ -201,6 +202,7 @@ function S.encoder_frame()
         encoder[who] = encoder_frame
         encoder_cur = encoder_cur + 1
         profile_end(who)
+        ltask.wakeup "encoder"
 --  textcell test
 --	cell.color(0x3)
 --	cell.open ">40% =3"
@@ -217,14 +219,6 @@ end
 local pause_token
 local continue_token
 
-function S.event_suspend(what)
-    if what == "will_suspend" then
-        S.pause()
-    elseif what == "did_resume" then
-        S.continue()
-    end
-end
-
 function S.pause()
     if pause_token then
         error "Can't pause twice."
@@ -239,49 +233,6 @@ function S.continue()
         return
     end
     ltask.wakeup(continue_token)
-end
-
-local WORLD_CAMERA_STATE = {
-    viewmat = nil,
-    projmat = nil,
-    deltatime = 0,
-    which_consumer  = nil,
-    clear = function (self)
-        self.viewmat = nil
-        self.projmat = nil
-        self.deltatime = 0
-    end,
-    update = function(self, viewmat, projmat, deltatime)
-        assert(not self:already_update())
-        self.viewmat = viewmat
-        self.projmat = projmat
-        self.deltatime = deltatime
-        self:check_wakeup()
-    end,
-    already_update = function(self)
-        return nil ~= self.viewmat
-    end,
-    check_wakeup = function (self)
-        if nil ~= self.which_consumer then
-            ltask.wakeup(self.which_consumer)
-        end
-    end,
-    check_and_wait = function (self)
-        if not self:already_update() then
-            self.which_consumer = coroutine.running()
-            ltask.wait(self.which_consumer)
-            self.which_consumer = nil
-        end
-    end,
-}
-
-function S.fetch_world_camera()
-    WORLD_CAMERA_STATE:check_and_wait()
-    return WORLD_CAMERA_STATE.viewmat, WORLD_CAMERA_STATE.projmat, WORLD_CAMERA_STATE.deltatime
-end
-
-function S.update_world_camera(...)
-    WORLD_CAMERA_STATE:update(...)
 end
 
 function S.frame()
@@ -306,13 +257,13 @@ function S.show_profile(what, show)
 end
 
 local maxfps = 30
+local fps = 0
 local frame_control; do
     local MaxTimeCachedFrame <const> = 1 --*1s
     local frame_first = 1
     local frame_last  = 0
     local frame_time = {}
     local frame_delta = {}
-    local fps = 0
     local lasttime = ltask.counter()
     local printtime = 0
     local printtext = ""
@@ -378,12 +329,12 @@ local frame_control; do
         print_fps()
         print_time()
         if maxfps and fps > maxfps then
-            local waittime = math.ceil((1/maxfps - delta)*1000)
+            local waittime = 1/maxfps - delta
             if waittime > 0 then
-                if waittime < 10 then
-                    waittime = 10
+                if waittime < 0.01 then
+                    waittime = 0.01
                 end
-                exclusive.sleep(waittime)
+                thread.sleep(waittime)
             end
         end
         lasttime = ltask.counter()
@@ -421,7 +372,7 @@ local function mainloop()
             encoder_frame = encoder_frame + 1
             encoder_cur = 0
             viewidmgr.check_remapping()
-            local f = bgfx.frame()
+            bgfx.frame()
             bgfx.dbg_text_clear()
             if pause_token then
                 ltask.wakeup(pause_token)
@@ -430,13 +381,10 @@ local function mainloop()
                 continue_token = nil
             end
             frame_control()
-            ltask.multi_wakeup("bgfx.frame", f)
-            WORLD_CAMERA_STATE:clear()
-            ltask.sleep(0)
+            ltask.multi_wakeup("bgfx.frame", 1000. / (maxfps or fps))
             profile_begin()
         else
-            exclusive.sleep(1)
-            ltask.sleep(0)
+            ltask.wait "encoder"
         end
     end
 end
@@ -509,4 +457,5 @@ end
 S.viewid_get        = viewidmgr.get
 S.viewid_generate   = viewidmgr.generate
 S.viewid_name       = viewidmgr.name
+
 return S

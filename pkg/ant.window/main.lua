@@ -3,17 +3,15 @@ local function start(initargs)
     local exclusive = {}
     if platform.os == "ios" then
         exclusive[#exclusive+1] = "ant.window|ios"
-    else
-        exclusive[#exclusive+1] = { "ant.window|window", initargs }
     end
     exclusive[#exclusive+1] = "timer"
-    exclusive[#exclusive+1] = "ant.hwi|bgfx"
-    if not __ANT_RUNTIME__ then
-        exclusive[#exclusive+1] = "subprocess"
-    end
     dofile "/engine/ltask.lua" {
         bootstrap = { "ant.window|boot", initargs },
         exclusive = exclusive,
+        worker_bind = {
+            "ant.window|window",
+            "ant.hwi|bgfx",
+        },
     }
 end
 

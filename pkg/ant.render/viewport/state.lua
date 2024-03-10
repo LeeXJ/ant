@@ -2,38 +2,53 @@ local ecs = ...
 local world = ecs.world
 
 local setting = import_package "ant.settings"
-local mu = import_package "ant.math".util
 
-local width, height = world.args.width, world.args.height
+local DEFAULT_RESOLUTION_WIDTH <const> = 1280
+local DEFAULT_RESOLUTION_HEIGHT <const> = 720
 
-local SCENE_RATIO <const> = setting:get "scene/scene_ratio" or 1.0
-local RESOLUTION_WIDTH <const> = 1280
-local RESOLUTION_HEIGHT <const> = 720
+local scene_viewrect  = {x=0, y=0,}
+local device_viewrect = {x=0, y=0,}
 
-local function get_resolution()
-    local w, h
-    w, h = (setting:get "scene/resolution"):match "(%d+)%a(%d+)"
-    return {w = tonumber(w and w or RESOLUTION_WIDTH), h = tonumber(h and h or RESOLUTION_HEIGHT)}
+local scene_ratio<const> = setting:get "scene/ratio"
+
+local function calc_scene_size()
+    assert(device_viewrect.h > 0)
+    assert(device_viewrect.w > device_viewrect.h)
+    local dr = device_viewrect.w / device_viewrect.h
+
+    local h
+    if scene_ratio then
+        h = math.floor(device_viewrect.h * scene_ratio+0.5)
+    else
+        h = math.min(DEFAULT_RESOLUTION_HEIGHT, device_viewrect.h)
+    end
+
+    return math.floor(dr*h+0.5), h
 end
 
-local resolution = get_resolution()
+local function log_viewrect()
+    local vr, dvr = scene_viewrect, device_viewrect
+    log.info("scene viewrect: ",    vr.x, vr.y, vr.w, vr.h)
+    log.info("device viewport: ",   dvr.x, dvr.y, dvr.w, dvr.h)
 
-local vp = {
-    x = 0,
-    y = 0,
-    w = width,
-    h = height
-}
+    local scene_scale_ratio<const>  = vr.w/dvr.w
+    log.info("scene scale ratio: ", scene_scale_ratio)
 
-local vr = mu.get_scene_view_rect(resolution, vp, SCENE_RATIO)
+    log.info("scene width/hegiht:",  vr.w/vr.h)
+    log.info("device width/hegiht:", dvr.w/dvr.h)
+end
 
-log.info("scene viewrect: ", vr.x, vr.y, vr.w, vr.h)
-log.info("scene ratio: ", SCENE_RATIO)
-log.info("device viewport: ", vp.x, vp.y, vp.w, vp.h)
+local function resize(w, h)
+    device_viewrect.w, device_viewrect.h = w, h
+    scene_viewrect.w, scene_viewrect.h = calc_scene_size()
+
+    log_viewrect()
+end
+
+resize(world.args.width, world.args.height)
 
 return {
-    viewrect = vr,
-    resolution = resolution,
-    scene_ratio = SCENE_RATIO,
-    device_size = vp,
+    viewrect        = scene_viewrect,
+    device_viewrect = device_viewrect,
+    resize          = resize,
 }

@@ -11,7 +11,7 @@ local mathpkg	= import_package "ant.math"
 local mu		= mathpkg.util
 
 local ientity   = ecs.require "ant.entity|entity"
-local imaterial = ecs.require "ant.asset|material"
+local imaterial = ecs.require "ant.render|material"
 
 local frustum_entity
 local function create_frustum_entity()
@@ -32,7 +32,7 @@ local function create_view_buffer_entity()
 		},
 		data = {
 			owned_mesh_buffer = true,
-			simplemesh = m,
+			mesh_result = m,
 			material = "/pkg/ant.resources/materials/texquad.material",
 			visible_state = "main_view",
 			render_layer = "translucent",

@@ -3,15 +3,16 @@ local sampler 		= import_package "ant.render.core".sampler
 local lfs 			= require "bee.filesystem"
 local image 		= require "image"
 local math3d		= require "math3d"
-local ltask			= require "ltask"
 local fastio		= require "fastio"
 
 local stringify 	= import_package "ant.serialize".stringify
 
 local TEXTUREC 		= require "tool_exe_path"("texturec")
 local shpkg			= import_package "ant.sh"
+local SH			= shpkg.sh
+local texcube		= import_package "ant.texture".cube
+
 local setting		= import_package "ant.settings"
-local SH, texutil	= shpkg.sh, shpkg.texture
 
 local irradianceSH_bandnum<const> = setting:get "graphic/ibl/irradiance_bandnum"
 
@@ -112,11 +113,9 @@ local compress_SH; do
 end
 
 local function build_Eml(cm)
-    local _, begin = ltask.now()
     print("start build irradiance SH, bandnum:", irradianceSH_bandnum)
     local Eml = SH.calc_Eml(cm, irradianceSH_bandnum)
-    local _, now = ltask.now()
-    print("finish build irradiance SH, time used:", now - begin)
+    print("finish build irradiance SH")
     return Eml
 end
 
@@ -197,7 +196,13 @@ return function (output, setting, param)
 
 		local info = image.parse(fastio.readall_f(output_bin:string()))
 		config.info = info
-
+		config.image = imgpath:string()
+		if param.lattice then
+			config.info.lattice = param.lattice
+		end
+		if param.atlas then
+			config.info.atlas = param.atlas
+		end
 		if config.build_irradianceSH then
 			local nomip<const> = true
 			local info, content = image.parse(fastio.readall_f(output_bin:string()), true, "RGBA32F", nomip)
@@ -205,7 +210,7 @@ return function (output, setting, param)
 				error "build SH need cubemap texture"
 			end
 			assert(info.bitsPerPixel // 8 == 16)
-			local cm = texutil.create_cubemap{w=info.width, h=info.height, texelsize=16, data=content}
+			local cm = texcube.create{w=info.width, h=info.height, texelsize=16, data=content}
 			config.irradiance_SH = build_irradiance_sh(cm)
 		end
 	else

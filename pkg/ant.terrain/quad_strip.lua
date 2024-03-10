@@ -11,7 +11,7 @@ local layout    = layoutmgr.get(layoutfmt)
 local stride<const> = layout.stride
 
 local ipl       = ecs.require "ant.polyline|polyline"
-local imaterial = ecs.require "ant.asset|material"
+local imaterial = ecs.require "ant.render|material"
 
 local function add_quad(p0, p1, normal, ww, offset, clr, vertices)
     local d = math3d.sub(p1, p0)
@@ -50,7 +50,8 @@ function qs_sys:entity_init()
                 "ant.render|simplerender",
             },
             data = {
-                simplemesh = quadstrip_mesh,
+                mesh_result = quadstrip_mesh,
+                owned_mesh_buffer = true,
                 material = e.material,
                 visible_state = "main_view",
                 scene = {

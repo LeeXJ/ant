@@ -14,7 +14,7 @@ local world_metatable = {}
 local world = {}
 world_metatable.__index = world
 
-local DEBUG <const> = luaecs.DEBUG
+local DEBUG <const> = false -- luaecs.DEBUG
 
 local function update_group_tag(w, groupid, data)
     for tag, t in pairs(w._group_tags) do
@@ -277,20 +277,14 @@ function world:create_instance(args)
         debuginfo = debuginfo,
     }
     local on_ready = args.on_ready
-    local on_message = args.on_message
-    local proxy_entity = {}
     if on_ready then
-        function proxy_entity.on_ready()
+        local proxy
+        local data = {}
+        function data.on_ready()
             on_ready(instance)
+            w:remove_entity(proxy)
         end
-    end
-    if on_message then
-        function proxy_entity.on_message(_, ...)
-            on_message(instance, ...)
-        end
-    end
-    if next(proxy_entity) then
-        instance.proxy = create_entity_by_data(w, args.group, proxy_entity, debuginfo)
+        proxy = create_entity_by_data(w, args.group, data, debuginfo)
     end
     return instance
 end
@@ -380,7 +374,10 @@ end
 
 local function cpustat_update(w, funcs, symbols)
     local ecs_world = w._ecs_world
-    local get_time = ltask.counter
+    local get_time = function ()
+        local _, t = ltask.now()
+        return t / 100
+    end
     return function()
         local stat = w._cpu_stat
         for i = 1, #funcs do
@@ -427,7 +424,15 @@ local function cpustat_update_then_print(w, funcs, symbols)
             end
             w._cpu_stat = {}
         end
-        dbg_print(0, 2, 0x02, "--- system")
+        local ecs = w.w
+        local components = {}
+        for _, name in ipairs { "eid", "scene", "render_object", "hitch" } do
+            if ecs:type(name) then
+                components[#components+1] = name..":"..ecs:count(name)
+            end
+        end
+        dbg_print(0, 2, 0x02, "--- "..table.concat(components, " "))
+        --dbg_print(0, 2, 0x02, "--- system")
         for i = 1, MaxText do
             dbg_print(2, 2+i, 0x02, printtext[i])
         end
@@ -626,14 +631,6 @@ function world:entity(eid, pattern)
     end
 end
 
-function world:entity_message(eid, ...)
-    self:pub {"EntityMessage", eid, ...}
-end
-
-function world:instance_message(instance, ...)
-    self:pub {"EntityMessage", instance.proxy, ...}
-end
-
 function world:import_feature(name)
     feature.import(self, { name })
 end
@@ -679,6 +676,10 @@ function world:dispatch_imgui(msg)
     return self._dispatch_imgui(msg)
 end
 
+function world:get_frame_time()
+    return self._frametime
+end
+
 local m = {}
 
 function m.new_world(config)
@@ -721,6 +722,7 @@ function m.new_world(config)
             system = {},
         },
         _mouse = { x = 0, y = 0 },
+        _frametime = 0,
         w = ecs,
     }, world_metatable)
 

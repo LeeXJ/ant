@@ -4,7 +4,7 @@ local w = world.w
 
 local math3d 	    = require "math3d"
 local assetmgr      = import_package "ant.asset"
-local imaterial     = ecs.require "ant.asset|material"
+local imaterial     = ecs.require "ant.render|material"
 local imesh         = ecs.require "ant.asset|mesh"
 local icompute      = ecs.require "ant.render|compute.compute"
 local irender       = ecs.require "ant.render|render"
@@ -96,7 +96,7 @@ local function create_sm_entity(gid, indices, mountain_material, cs_material, me
          },
         data = {
             scene         = {},
-            simplemesh    = MERGE_MESH,
+            mesh_result   = MERGE_MESH,
             material      = mountain_material, 
             visible_state = "main_view|cast_shadow",
             stonemountain = {

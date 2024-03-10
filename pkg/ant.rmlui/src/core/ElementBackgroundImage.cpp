@@ -40,6 +40,16 @@ static Rect CalcUV(const Rect& surface, const Rect& texture) {
 	return uv;
 }
 
+static void UpdateUV(Rect& uv, AtlasData* texture) {
+	uv.origin = uv.origin + texture->uv_rect.origin;
+	uv.size.w = uv.size.w * texture->uv_rect.size.w;
+	uv.size.h = uv.size.h * texture->uv_rect.size.h;
+}
+
+static float CalcLength(float percent, Element* e) {
+	return percent * e->GetBounds().size.w * 0.01f;
+}
+
 static auto GetSamplerFlag(Style::BackgroundRepeat v) {
 	switch (v) {
 	case Style::BackgroundRepeat::NoRepeat:
@@ -65,9 +75,21 @@ bool ElementBackground::GenerateImageGeometry(Element* element, Geometry& geomet
 	if (path.empty()) {
 		return false;
 	}
+
 	const auto& bounds = element->GetBounds();
 	const auto& border = element->GetBorder();
 	const auto& padding = element->GetPadding();
+
+	bool isRT = false;
+	if (regex_match(path, std::regex("<.*>"))) {
+		isRT = true;
+		path = regex_replace(path, std::regex("[<>]"), std::string(""));
+	}
+	auto const& texture = isRT? Texture::Fetch(element, path, bounds.size): Texture::Fetch(element, path);
+	if (!texture) {
+		return false;
+	}
+	bool isAtlas = Texture::GetType(texture->handle) == Texture::TextureType::atlas;
 
 	Style::BoxType origin = element->GetComputedProperty(PropertyId::BackgroundOrigin).GetEnum<Style::BoxType>();
 	Rect surface = Rect { {0, 0}, bounds.size };
@@ -105,16 +127,6 @@ bool ElementBackground::GenerateImageGeometry(Element* element, Geometry& geomet
 	if (!color.IsVisible())
 		return false;
 
-	bool isRT = false;
-	if (regex_match(path, std::regex("<.*>"))) {
-		isRT = true;
-		path = regex_replace(path, std::regex("[<>]"), std::string(""));
-	}
-	auto const& texture = isRT? Texture::Fetch(element, path, surface.size): Texture::Fetch(element, path);
-	if (!texture) {
-		return false;
-	}
-
 	Rect background {};
 	background.origin = surface.origin + Point {
 		PropertyComputeX(element, element->GetComputedProperty(PropertyId::BackgroundPositionX)),
@@ -123,18 +135,18 @@ bool ElementBackground::GenerateImageGeometry(Element* element, Geometry& geomet
 	switch (element->GetComputedProperty(PropertyId::BackgroundSize).GetEnum<Style::BackgroundSize>()) {
 	case Style::BackgroundSize::Contain: {
 		Size scale {
-			surface.size.w / texture.dimensions.w,
-			surface.size.h / texture.dimensions.h
+			surface.size.w / texture->dimensions.w,
+			surface.size.h / texture->dimensions.h
 		};
 		if (scale.w < scale.h) {
 			background.size = {
 				surface.size.w,
-				surface.size.w / texture.dimensions.w * texture.dimensions.h,
+				surface.size.w / texture->dimensions.w * texture->dimensions.h,
 			};
 		}
 		else {
 			background.size = {
-				surface.size.h / texture.dimensions.h * texture.dimensions.w,
+				surface.size.h / texture->dimensions.h * texture->dimensions.w,
 				surface.size.h,
 			};
 		}
@@ -142,25 +154,25 @@ bool ElementBackground::GenerateImageGeometry(Element* element, Geometry& geomet
 	}
 	case Style::BackgroundSize::Cover: {
 		Size scale {
-			surface.size.w / texture.dimensions.w,
-			surface.size.h / texture.dimensions.h
+			surface.size.w / texture->dimensions.w,
+			surface.size.h / texture->dimensions.h
 		};
 		if (scale.w > scale.h) {
 			background.size = {
 				surface.size.w,
-				surface.size.w / texture.dimensions.w * texture.dimensions.h,
+				surface.size.w / texture->dimensions.w * texture->dimensions.h,
 			};
 		}
 		else {
 			background.size = {
-				surface.size.h / texture.dimensions.h * texture.dimensions.w,
+				surface.size.h / texture->dimensions.h * texture->dimensions.w,
 				surface.size.h,
 			};
 		}
 		break;
 	}
 	case Style::BackgroundSize::Auto: {
-		background.size = texture.dimensions;
+		background.size = texture->dimensions;
 		break;
 	}
 	default:
@@ -174,40 +186,45 @@ bool ElementBackground::GenerateImageGeometry(Element* element, Geometry& geomet
 	}
 
 	Rect uv = CalcUV(surface, background);
+	if (isAtlas) {
+		UpdateUV(uv, (AtlasData*)texture);	
+	}
+
 	auto backgroundRepeat = element->GetComputedProperty(PropertyId::BackgroundRepeat).GetEnum<Style::BackgroundRepeat>();
 
 	if (backgroundRepeat == Style::BackgroundRepeat::Repeat){
-		uv.size = uv.size / ( Size(texture.dimensions) / background.size);
+		uv.size = uv.size / ( Size(texture->dimensions) / background.size);
 	}
 	else if (backgroundRepeat == Style::BackgroundRepeat::RepeatX){
-		uv.size = uv.size / ( Size(texture.dimensions) / background.size);
-		background.size.h = background.size.h > texture.dimensions.h ? texture.dimensions.h : background.size.h;
+		uv.size = uv.size / ( Size(texture->dimensions) / background.size);
+		background.size.h = background.size.h > texture->dimensions.h ? texture->dimensions.h : background.size.h;
 	}
 	else if (backgroundRepeat == Style::BackgroundRepeat::RepeatY){
-		uv.size = uv.size / ( Size(texture.dimensions) / background.size);
-		background.size.w = background.size.w > texture.dimensions.w ? texture.dimensions.w : background.size.w;		
+		uv.size = uv.size / ( Size(texture->dimensions) / background.size);
+		background.size.w = background.size.w > texture->dimensions.w ? texture->dimensions.w : background.size.w;		
 	}
 
-	Material* material = GetRender()->CreateTextureMaterial(texture.handle, GetSamplerFlag(backgroundRepeat));
+	Material* material = GetRender()->CreateTextureMaterial(texture->handle, GetSamplerFlag(backgroundRepeat));
 	geometry.SetMaterial(material);
 
-	auto lattice_x1 = element->GetComputedProperty(PropertyId::BackgroundLatticeX1).Get<PropertyFloat>().value / 100.0f;
-	if (lattice_x1 > 0) {
+	if (Texture::GetType(texture->handle) == Texture::TextureType::lattice) {
 		if (origin == Style::BoxType::ContentBox && edge.padding.size() != 4) {
 			return false;
 		}
 		else {
-			auto lattice_y1 = element->GetComputedProperty(PropertyId::BackgroundLatticeY1).Get<PropertyFloat>().value / 100.0f;
-			auto lattice_x2 = element->GetComputedProperty(PropertyId::BackgroundLatticeX2).Get<PropertyFloat>().value / 100.0f;
-			auto lattice_y2 = element->GetComputedProperty(PropertyId::BackgroundLatticeY2).Get<PropertyFloat>().value / 100.0f;
-			auto lattice_u = element->GetComputedProperty(PropertyId::BackgroundLatticeU).Get<PropertyFloat>().value / 100.0f;
-			auto lattice_v = element->GetComputedProperty(PropertyId::BackgroundLatticeV).Get<PropertyFloat>().value / 100.0f;			
+			Rml::LatticeData::Lattice lattice = ((Rml::LatticeData*)texture)->lattice;
+			float x1 = lattice.x1;
+			float x2 = lattice.x2;
+			float y1 = lattice.y1;
+			float y2 = lattice.y2;
+			float u  = lattice.u;
+			float v  = lattice.v;	
 			std::vector<Rect> surface_array(9);
 			std::vector<Rect> uv_array(9);
-			GetRectArray(lattice_x1, lattice_y1, lattice_x2, lattice_y2, surface, surface_array);
-			float ur = 1.f - lattice_u - 2.f / texture.dimensions.w;
-			float vb = 1.f - lattice_v - 2.f / texture.dimensions.h;
-			GetRectArray(lattice_u, lattice_v, ur, vb, uv, uv_array);
+			GetRectArray(x1, y1, x2, y2, surface, surface_array);
+			float ur = 1.f - u - 2.f / texture->dimensions.w;
+			float vb = 1.f - v - 2.f / texture->dimensions.h;
+			GetRectArray(u, v, ur, vb, uv, uv_array);
 			for (int idx = 0; idx < 9; ++idx) {
 				geometry.AddRectFilled(surface_array[idx], color);
 				geometry.UpdateUV(4, surface_array[idx], uv_array[idx]);
@@ -235,6 +252,13 @@ bool ElementBackground::GenerateImageGeometry(Element* element, Geometry& geomet
 				if (!background.IsEmpty()) {
 					geometry.AddRectFilled(background, color);
 					geometry.UpdateUV(4, surface, uv);
+ 					if (isAtlas) {
+						Rect vf = ((AtlasData*)texture)->vertex_factor;
+						background.origin = background.origin + Point {vf.origin.x * background.size.w, vf.origin.y * background.size.h};
+						background.size.w = vf.size.w * background.size.w;
+						background.size.h = vf.size.h * background.size.h;
+						geometry.UpdateRectFilled(background, 0, 0, color);
+					}
 				}
 			}
 			else {

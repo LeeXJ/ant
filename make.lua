@@ -1,6 +1,6 @@
 local lm = require "luamake"
 
-lm:required_version "1.6"
+lm:required_version "1.7"
 --lm.luaversion = "lua55"
 
 local plat = (function ()
@@ -25,12 +25,6 @@ lm:conf {
     cxx = "c++20",
     --TODO
     visibility = "default",
-    defines = {
-        "BGFX_CONFIG_DEBUG_UNIFORM=0",
-        "GLM_ENABLE_EXPERIMENTAL",
-        "GLM_FORCE_QUAT_DATA_XYZW",
-        "GLM_FORCE_INTRINSICS",
-    },
     msvc = {
         defines = {
             "_CRT_SECURE_NO_WARNINGS",
@@ -54,6 +48,35 @@ lm:conf {
         arch = "aarch64",
         vendor = "linux",
         sys = "android33",
+    }
+}
+
+lm:conf "glm" {
+    defines = {
+        "GLM_ENABLE_EXPERIMENTAL",
+        "GLM_FORCE_QUAT_DATA_XYZW",
+        "GLM_FORCE_INTRINSICS",
+    },
+    includes = {
+        lm.AntDir .. "/3rd/glm",
+    },
+}
+
+lm:conf "bgfx" {
+    defines = lm.mode == "debug" and {
+        "BX_CONFIG_DEBUG=1",
+        "BGFX_CONFIG_DEBUG_UNIFORM=0",
+    } or {
+        "BX_CONFIG_DEBUG=0",
+    },
+    includes = {
+        lm.AntDir .. "/3rd/bgfx/include",
+        lm.AntDir .. "/3rd/bx/include",
+        lm.os == "windows" and {
+            lm.compiler == "msvc"
+            and { lm.AntDir .. "/3rd/bx/include/compat/msvc" }
+            or { lm.AntDir .. "/3rd/bx/include/compat/mingw" },
+        }
     }
 }
 
