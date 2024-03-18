@@ -8,14 +8,14 @@ if setting:get "graphic/disable_pre_z" then
     return
 end
 
-local bgfx          = require "bgfx"
+local ivm           = ecs.require "ant.render|visible_mask"
 local irender       = ecs.require "ant.render|render"
 local queuemgr      = ecs.require "queue_mgr"
 
 local R             = world:clibs "render.render_material"
 local RM            = ecs.require "ant.material|material"
 
-local irq           = ecs.require "ant.render|render_system.renderqueue"
+local irq           = ecs.require "ant.render|renderqueue"
 local irl		    = ecs.require "ant.render|render_layer.render_layer"
 
 local assetmgr      = import_package "ant.asset"
@@ -57,9 +57,9 @@ function s:data_changed()
 end
 
 function s:entity_ready()
-    for e in w:select "filter_result visible_state:in render_layer:in material:in" do
-        if e.visible_state["pre_depth_queue"] and irl.is_opacity_layer(e.render_layer) then
-            w:extend(e, "material:in render_object:update filter_material:in")
+    for e in w:select "filter_result render_object:update render_layer:in material:in" do
+        if ivm.check(e, "pre_depth_queue") and irl.is_opacity_layer(e.render_layer) then
+            w:extend(e, "material:in filter_material:in")
             local matres = assetmgr.resource(e.material)
             if not matres.fx.setting.no_predepth then
                 local fm = e.filter_material

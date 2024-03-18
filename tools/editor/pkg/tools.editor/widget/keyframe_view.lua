@@ -1244,6 +1244,7 @@ function m.show()
 end
 local memfs = import_package "ant.vfs".memory
 local lfs   = require "bee.filesystem"
+local global_data    = require "common.global_data"
 function m.save(path)
     if not next(allanims) then
         return
@@ -1282,19 +1283,8 @@ function m.save(path)
         }
     end
     utils.write_file(filename, stringify(animdata))
-    -- if isSke then
-    --     local bin_file = filename:sub(1, -5) .. "bin"
-    --     local mount = false
-    --     local lpath = lfs.path(bin_file)
-    --     if not lfs.exists(lpath) then
-    --         mount = true
-    --     end
-    --     local e <close> = world:entity(anim_eid, "animation:in")
-    --     ozzoffline.save(e.animation.status[current_anim.name].handle, bin_file)
-    --     if mount then
-    --         memfs.update("/" .. lfs.relative(lpath, gd.project_root):string(), lpath:string())
-    --     end
-    -- end
+    local lpath = lfs.path(filename)
+    memfs.update("/" .. lfs.relative(lpath, global_data.project_root):string(), lpath:string())
     if file_path ~= filename then
         file_path = filename
     end
@@ -1357,13 +1347,11 @@ function m.load(path_str)
     file_path = path:string()
 end
 
-local ivs		= ecs.require "ant.render|visible_state"
 local imaterial = ecs.require "ant.render|material"
 local bone_color    = math3d.constant("v4", {0.4, 0.4, 1, 0.8})
 local bone_highlight_color = math3d.constant("v4", {1.0, 0.4, 0.4, 0.8})
 
 local ientity 	= ecs.require "ant.entity|entity"
-local imesh 	= ecs.require "ant.asset|mesh"
 
 local function create_joint_entity(joint_name)
     local template = {
@@ -1372,7 +1360,8 @@ local function create_joint_entity(joint_name)
         },
         data = {
             scene = {},
-            visible_state = "selectable",
+            visible_masks = "selectable",
+            visible = true,
             material = "/pkg/tools.editor/resource/materials/joint.material",
             mesh = "/pkg/ant.resources.binary/meshes/base/sphere.glb|meshes/Sphere_P1.meshbin",--"/pkg/tools.editor/resource/meshes/joint.meshbin",
             render_layer = "translucent",
@@ -1446,7 +1435,8 @@ local function create_bone_entity(joint_name)
             render_layer = "translucent",
 			mesh_result	= ientity.create_mesh({"p3|n3|t2", bone_vert}),
             owned_mesh_buffer = true,
-			visible_state= "selectable",
+			visible = true,
+            visible_masks = "selectable",
 			on_ready 	= function(e)
                 imaterial.set_property(e, "u_basecolor_factor", bone_color)
 			end
@@ -1471,6 +1461,7 @@ function m.on_eid_delete(eid)
     end
 end
 local joint_scale_map
+local irender	= ecs.require "ant.render|render"
 function m.init(skeleton)
     for e in w:select "eid:in animation:in" do
         if e.animation.skeleton == skeleton then
@@ -1554,8 +1545,8 @@ function m.init(skeleton)
                             joint_scale_map[joint.index] = bone_len * joint_scale
                         end
                     end
-                    ivs.set_state(mesh_e, "main_view", show)
-                    ivs.set_state(bone_mesh_e, "main_view", show)
+                    irender.set_visible(mesh_e, show)
+                    irender.set_visible(bone_mesh_e, show)
                 end
             end
         end

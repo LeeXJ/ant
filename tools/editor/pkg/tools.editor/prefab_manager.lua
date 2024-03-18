@@ -11,7 +11,7 @@ local aio           = import_package "ant.io"
 local stringify     = import_package "ant.serialize".stringify
 
 local iom           = ecs.require "ant.objcontroller|obj_motion"
-local irq           = ecs.require "ant.render|render_system.renderqueue"
+local irq           = ecs.require "ant.render|renderqueue"
 local ilight        = ecs.require "ant.render|light.light"
 local imodifier     = ecs.require "ant.modifier|modifier"
 local camera_mgr    = ecs.require "camera.camera_manager"
@@ -62,7 +62,7 @@ local function create_light_billboard(light_eid, lighttype)
             scene = {
                 parent = light_eid
             },
-            visible_state = "main_view",
+            visible = true,
             material = "/pkg/tools.editor/resource/materials/billboard_"..lighttype..".material",
             mesh_result = ientity.create_mesh{"p3|t2", vbdata},
             owned_mesh_buffer = true,
@@ -142,17 +142,21 @@ end
 
 local function create_default_light(type, parent)
     local light, tpl = ilight.create {
-        srt = {t = {0, 5, 0}, r = type == "directional" and {math.rad(130), 0, 0} or nil, parent = parent},
+        srt = {
+            t = {0, 5, 0},
+            r = (type == "directional") and {math.rad(130), 0, 0} or nil,
+            parent = parent
+        },
         name            = type .. gen_light_id(),
         type            = type,
         color           = {1, 1, 1, 1},
-        make_shadow     = false,
-        intensity       = 130000,--ilight.default_intensity(lt),
+        make_shadow     = true,
+        intensity       = 130000,
         intensity_unit  = ilight.default_intensity_unit(type),
-        range           = 10,
+        range           = (type ~= "directional") and 10 or nil,
         motion_type     = "dynamic",
-        inner_radian    = math.rad(10),
-        outter_radian   = math.rad(30)
+        inner_radian    = (type == "spot") and math.rad(10) or nil,
+        outter_radian   = (type == "spot") and math.rad(30) or nil
     }
     create_light_billboard(light, type)
     return light, utils.deep_copy(tpl)
@@ -201,6 +205,7 @@ function m:show_terrain(enable)
         iterrain.create_plane_terrain({[0] = {{x = -500, y = -500, type = "terrain"}}}, "opacity", 1000, TERRAIN_MATERIAL)
     end
 end
+
 function m:clone(eid)
     local srctpl = hierarchy:get_node_info(eid)
     if srctpl.filename then
@@ -256,7 +261,8 @@ function m:create(what, config)
                 },
                 data = {
                     scene = {t = {0, offsety , 0}},
-                    visible_state = "main_view|selectable",
+                    visible_masks = "main_view|selectable",
+                    visible = true,
                     material = "/pkg/ant.resources/materials/pbr_default.material",
                     mesh = geom_mesh_file[config.type],
                 },
@@ -306,7 +312,8 @@ end
 
 function m:on_prefab_ready(prefab)
     local entitys = prefab.tag["*"]
-    local function find_e(entitys, id)
+
+    local function find_e(id)
         for _, eid in ipairs(entitys) do
             local e <close> = world:entity(eid, "eid:in")
             if e.eid == id then
@@ -344,7 +351,7 @@ function m:on_prefab_ready(prefab)
         local eid = entitys[j]
         local e <close> = world:entity(eid, "scene?in light?in")
         local scene = e.scene
-        local parent = scene and find_e(entitys, scene.parent)
+        local parent = scene and find_e(scene.parent)
         if pt.prefab then
             last_tpl.filename = pt.prefab
             local children = sub_tree(parent, j)
@@ -370,7 +377,7 @@ function m:on_prefab_ready(prefab)
         last_tpl = pt
         if e.light then
             create_light_billboard(eid, e.light.type)
-            light_gizmo.bind(eid)
+            light_gizmo.on_target(eid)
             light_gizmo.show(false)
         end
     end
@@ -513,10 +520,37 @@ function m:choose_prefab()
         ImGui.EndPopup()
     end
 end
+-- compile sandbox
+-- local platform_path = "windows-direct3d11"
+-- local vfsrepo = import_package "ant.vfs"
+-- local cr = import_package "ant.compile_resource"
+-- local function msgh(errmsg)
+--     return debug.traceback(errmsg)
+-- end
+-- local function compile_resource(cfg, name, path)
+--     local ok, lpath = xpcall(cr.compile_file, msgh, cfg, name, path)
+--     if ok then
+--         return lpath
+--     end
+--     print(string.format("compile failed:\n\tvpath: %s\n\tlpath: %s\n%s", name, path, lpath))
+-- end
+-- local function compile_glb(glb_lpath)
+--     local vpath = (lfs.path('/') / lfs.relative(glb_lpath, gd.project_root)):string()
+--     local repopath = global_data.editor_root / "temp"--gd.project_root:string()--fs.path(glb_lpath):parent_path():string()
+--     local std_vfs <close> = vfsrepo.new_std {
+--         rootpath = repopath,
+--         nohash = true,
+--     }
+--     local tiny_vfs = vfsrepo.new_tiny(repopath)
+--     local cfg = cr.init_setting(tiny_vfs, platform_path)
+--     local compile_path = compile_resource(cfg, vpath, glb_lpath)
+--     utils.mount_memfs2(compile_path, vpath, compile_path)
+--     return vpath, compile_path
+-- end
 
 local function compile_glb(filename)
     -- TODO: trigger glb compile
-    aio.readall(filename)
+    -- aio.readall(filename)
 end
 
 local function cook_prefab(prefab_filename)
@@ -526,7 +560,7 @@ local function cook_prefab(prefab_filename)
     end
     compile_glb(prefab_filename)
     local current_compile_path = fs.path(pl[1]):localpath():string()
-    utils.mount_memfs(pl[1])
+    -- utils.mount_memfs(pl[1])
     prefab_filename = prefab_filename:gsub("|", "/")
     local prefab_template = serialize.parse(prefab_filename, aio.readall(prefab_filename))
     for _, tpl in ipairs(prefab_template) do
@@ -538,7 +572,8 @@ local function cook_prefab(prefab_filename)
 end
 
 function m:compile_current_glb()
-    compile_glb(self.prefab_filename)
+    local vpath = (lfs.path('/') / lfs.relative(self.glb_filename, gd.project_root)):string()
+    aio.readall(vpath)
 end
 
 function m:open(filename, prefab_name, patch_tpl)
@@ -549,14 +584,13 @@ function m:open(filename, prefab_name, patch_tpl)
         isglb = true
     end
     local path_list = isglb and utils.split_ant_path(filename) or {}
-    local virtual_prefab_path = (lfs.path('/') / lfs.relative((#path_list > 1) and path_list[1] or filename, gd.project_root)):string()
+    local virtual_path = (lfs.path('/') / lfs.relative((#path_list > 1) and path_list[1] or filename, gd.project_root)):string()
     if #path_list > 1 then
         self.glb_filename = path_list[1]
         self.prefab_name = path_list[2]
-        gd.virtual_prefab_path = virtual_prefab_path
-        gd.current_compile_path = cook_prefab(virtual_prefab_path .. "|".. self.prefab_name)
-        virtual_prefab_path = virtual_prefab_path .. "/" .. self.prefab_name
-        self.prefab_template = serialize.parse(virtual_prefab_path, aio.readall(virtual_prefab_path))
+        gd.virtual_glb_path = virtual_path
+        virtual_path = virtual_path .. "/" .. self.prefab_name
+        self.prefab_template = serialize.parse(virtual_path, aio.readall(virtual_path))
 
         self.origin_patch_template = patch_tpl or {}
         self.patch_template = {}
@@ -591,14 +625,14 @@ function m:open(filename, prefab_name, patch_tpl)
     end
 
     self.current_prefab = world:create_instance {
-        prefab = virtual_prefab_path,
+        prefab = virtual_path,
         on_ready = function(instance)
             self:on_prefab_ready(instance)
         end
     }
     local glbfile, _ = filename:match "([^|]+)|([%a%.]+)"
     editor_setting.add_recent_file(glbfile and glbfile or filename)
-    world:pub {"WindowTitle", virtual_prefab_path}
+    world:pub {"WindowTitle", virtual_path}
 end
 
 local function remove_entity_self(eid)
@@ -622,25 +656,26 @@ local function remove_entity_self(eid)
 end
 
 function m:create_ground()
-    if not self.plane then
-        local imaterial = ecs.require "ant.render|material"
-        self.plane = world:create_entity {
-            policy = {
-                "ant.render|render",
-            },
-            data = {
-                scene = {s = {200, 1, 200}},
-                mesh  = "/pkg/tools.editor/resource/plane.glb|meshes/Plane_P1.meshbin",
-                material    = "/pkg/tools.editor/resource/materials/texture_plane.material",
-                render_layer = "background",
-                visible_state= "main_view",
-                on_ready = function (e)
-                    imaterial.set_property(e, "u_uvmotion", math3d.vector{0, 0, 100, 100})
-                end
-            },
-            tag = { "ground" }
-        }
+    if self.plane then
+        return
     end
+    local imaterial = ecs.require "ant.render|material"
+    self.plane = world:create_entity {
+        policy = {
+            "ant.render|render",
+        },
+        data = {
+            scene           = {s = {200, 1, 200}},
+            mesh            = "/pkg/tools.editor/resource/plane.glb|meshes/Plane_P1.meshbin",
+            material        = "/pkg/tools.editor/resource/materials/texture_plane.material",
+            render_layer    = "background",
+            visible = true,
+            on_ready = function (e)
+                imaterial.set_property(e, "u_uvmotion", math3d.vector{0, 0, 100, 100})
+            end
+        },
+        tag = { "ground" }
+    }
 end
 
 function m:reset_prefab(noscene)
@@ -700,10 +735,6 @@ function m:reload()
 end
 
 function m:add_effect(filename)
-    for path in lfs.pairs(lfs.path(filename):parent_path()) do
-        local vpath = (lfs.path('/') / lfs.relative(path, gd.project_root)):string()
-        memfs.update(vpath, path:string())
-    end
     local virtual_path = (lfs.path('/') / lfs.relative(filename, gd.project_root)):string()
     if not self.root then
         self:reset_prefab()
@@ -721,7 +752,7 @@ function m:add_effect(filename)
                 path = virtual_path,
                 speed = 1.0,
             },
-            visible_state = "main_queue"
+            visible = true,
 		},
         tag = {
             name
@@ -746,7 +777,7 @@ function m:add_prefab(path)
     local virtual_path = (lfs.path('/') / lfs.relative((#path_list > 1) and path_list[1] or path, gd.project_root)):string()
     if #path_list > 1 then
         virtual_path = virtual_path .. "|".. path_list[2]
-        cook_prefab(virtual_path)
+        -- cook_prefab(virtual_path)
     end
     local parent = gizmo.target_eid or (self.scene and self.scene or self.root)
     local v_root, temp = create_simple_entity(tostring(fs.path(path):stem()), parent)
@@ -782,7 +813,7 @@ function m:get_hitch_content()
                 hitch = {
                     group = 0,
                 },
-                visible_state = "main_view|cast_shadow|selectable",
+                visible = true,
             },
             tag = {
                 "hitch"
@@ -921,7 +952,7 @@ function m:save(path)
             end
             if #final_template > 0 then
                 utils.write_file(self.glb_filename..".patch", stringify(final_template))
-                assetmgr.unload(gd.virtual_prefab_path.."/" .. self.anim_file)
+                assetmgr.unload(gd.virtual_glb_path.."/" .. self.anim_file)
                 assetmgr.unload(self.glb_filename..".patch")
                 assetmgr.unload(self.glb_filename.."|"..self.prefab_name)
                 world:pub {"Save"}
@@ -1006,18 +1037,20 @@ function m:update_tag_list()
     local srt_mtl_list = {""}
     local mtl_list = {""}
     local efk_list = {}
-    for k, value in pairs(self.current_prefab.tag) do
-        if k ~= "*" and k ~= "animation" then
-            for _, eid in ipairs(value) do
-                local ee <close> = world:entity(eid, "scene?in material?in efk?in")
-                if ee.scene or ee.material then
-                    srt_mtl_list[#srt_mtl_list + 1] = k
-                    if ee.material then
-                        mtl_list[#mtl_list + 1] = k
+    if self.current_prefab then
+        for k, value in pairs(self.current_prefab.tag) do
+            if k ~= "*" and k ~= "animation" then
+                for _, eid in ipairs(value) do
+                    local ee <close> = world:entity(eid, "scene?in material?in efk?in")
+                    if ee.scene or ee.material then
+                        srt_mtl_list[#srt_mtl_list + 1] = k
+                        if ee.material then
+                            mtl_list[#mtl_list + 1] = k
+                        end
                     end
-                end
-                if ee.efk then
-                    efk_list[#efk_list + 1] = k
+                    if ee.efk then
+                        efk_list[#efk_list + 1] = k
+                    end
                 end
             end
         end
@@ -1292,7 +1325,7 @@ function m:do_material_patch(eid, path, v)
     local tpl = info.template
     if not self.materials_names then
         -- local ret = utils.split_ant_path(tpl.data.material)
-        local fn = gd.virtual_prefab_path .. "/materials_names.ant"
+        local fn = gd.virtual_glb_path .. "/materials_names.ant"
         self.materials_names = serialize.parse(fn, aio.readall(fn))
     end
     local origin = get_origin_material_name(self.materials_names, tostring(fs.path(tpl.data.material):stem()))

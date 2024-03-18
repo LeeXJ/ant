@@ -164,7 +164,7 @@ local function add_polylines(polymesh, line_width, color, material, srt, render_
             scene = {s = srt.s, r = srt.r, t = srt.t, parent = srt.parent},
             mesh_result = polymesh,
             material    = material,
-            visible_state= hide and "" or "main_view|velocity_queue",
+            visible     = not hide,
             render_layer= render_layer or "background",
             on_ready = function (e)
                 w:extend(e, "polyline:in")

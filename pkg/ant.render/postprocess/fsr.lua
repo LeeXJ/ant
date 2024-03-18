@@ -19,7 +19,7 @@ local queuemgr      = ecs.require "queue_mgr"
 local util          = ecs.require "postprocess.util"
 local imaterial     = ecs.require "ant.render|material"
 local irender       = ecs.require "ant.render|render"
-local irq           = ecs.require "ant.render|render_system.renderqueue"
+local irq           = ecs.require "ant.render|renderqueue"
 local icompute      = ecs.require "ant.render|compute.compute"
 local iviewport     = ecs.require "ant.render|viewport.state"
 local layoutmgr     = renderpkg.layoutmgr
@@ -164,7 +164,7 @@ local function create_fsr_resolve_entity(ratio)
         data = {
             mesh_result         = to_mesh_buffer(vb, irender.quad_ib()),
             material            = "/pkg/ant.resources/materials/postprocess/fsr_resolve.material",
-            visible_state       = "fsr_resolve_queue",
+            visible_masks       = "",
             fsr_resolve_drawer  = true,
             scene               = {},
         }

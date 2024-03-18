@@ -2,6 +2,11 @@ local ecs   = ...
 local world = ecs.world
 local w     = world.w
 
+--disable
+if true then
+    return
+end
+
 local setting = import_package "ant.settings"
 local ENABLE_FXAA<const>    = setting:get "graphic/postprocess/fxaa/enable"
 local ENABLE_TAA   <const>  = setting:get "graphic/postprocess/taa/enable"
@@ -16,7 +21,7 @@ local util          = ecs.require "postprocess.util"
 local queuemgr      = ecs.require "queue_mgr"
 local imaterial     = ecs.require "ant.render|material"
 local irender       = ecs.require "ant.render|render"
-local irq           = ecs.require "ant.render|render_system.renderqueue"
+local irq           = ecs.require "ant.render|renderqueue"
 local ifsr          = ecs.require "ant.render|postprocess.fsr"
 local iviewport     = ecs.require "ant.render|viewport.state"
 
@@ -42,7 +47,7 @@ function sc_sys:init()
         data = {
             mesh_result  = irender.full_quad(),
             material     = "/pkg/ant.resources/materials/postprocess/swapchain.material",
-            visible_state= "swapchain_queue",
+            visible_masks= "",
             scene        = {},
         }
     }

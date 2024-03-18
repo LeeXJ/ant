@@ -1,6 +1,7 @@
 #include <Cocoa/Cocoa.h>
 #include "../../window.h"
 #include <Carbon/Carbon.h>
+#import <QuartzCore/CAMetalLayer.h>
 #include <stdio.h>
 
 static ant::window::keyboard_state get_keyboard_state(NSEvent* event) {
@@ -174,11 +175,11 @@ static int32_t clamp(int32_t v, int32_t min, int32_t max) {
 @interface WindowDelegate : NSObject<NSWindowDelegate> {
     uint32_t m_count;
     NSWindow* m_window;
-    struct ant_window_callback* m_cb;
+    lua_State* m_L;
 }
 - (id)init;
 - (void)getMouseX:(int32_t*)outx getMouseY:(int32_t*)outy;
-- (void)windowCreated:(NSWindow*)window initCallback:(struct ant_window_callback*)callback ;
+- (void)windowCreated:(NSWindow*)window lua:(lua_State*)L ;
 - (void)windowWillClose:(NSNotification*)notification;
 - (BOOL)windowShouldClose:(NSWindow*)window;
 @end
@@ -202,17 +203,17 @@ static int32_t clamp(int32_t v, int32_t min, int32_t max) {
 	*outx = scale * clamp(x, 0, (int32_t)adjustFrame.size.width);
 	*outy = scale * clamp(y, 0, (int32_t)adjustFrame.size.height);
 }
-- (void)windowCreated:(NSWindow*)window initCallback:(struct ant_window_callback*)callback {
+- (void)windowCreated:(NSWindow*)window lua:(lua_State*)L {
 	assert(window);
     m_window = window;
-    m_cb = callback;
+    m_L = L;
 	[window setDelegate:self];
 	assert(self->m_count < ~0u);
 	self->m_count += 1;
 }
 - (void)windowWillClose:(NSNotification*)notification {
 	(void)notification;
-    window_message_exit(m_cb);
+    window_message_exit(m_L);
 }
 - (BOOL)windowShouldClose:(NSWindow*)window {
 	assert(window);
@@ -226,12 +227,20 @@ static int32_t clamp(int32_t v, int32_t min, int32_t max) {
 @end
 
 id g_dg;
-struct ant_window_callback* g_cb;
+lua_State* g_L;
 WindowDelegate* g_wd = nil;
 int32_t g_mx = 0;
 int32_t g_my = 0;
 
-void* peekwindow_init(struct ant_window_callback* cb, const char *size) {
+CALayer* getLayer(NSWindow* nsWindow) {
+	NSView* contentView = [nsWindow contentView];
+	[contentView setWantsLayer:YES];
+    CALayer* metalLayer = [CAMetalLayer layer];
+    [contentView setLayer:metalLayer];
+	return metalLayer;
+}
+
+bool window_init(lua_State* L, const char *size) {
 	NSScreen *screen = [NSScreen mainScreen];
 	NSRect visibleFrame = screen.visibleFrame;
 	int w = (int)(visibleFrame.size.width * 0.7f);
@@ -260,7 +269,7 @@ void* peekwindow_init(struct ant_window_callback* cb, const char *size) {
     [win makeMainWindow];
 
     g_wd = [WindowDelegate new];
-    [g_wd windowCreated:win initCallback:cb];
+    [g_wd windowCreated:win lua:L];
 
     [NSApplication sharedApplication];
     g_dg = [AppDelegate new];
@@ -268,11 +277,11 @@ void* peekwindow_init(struct ant_window_callback* cb, const char *size) {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     [NSApp activateIgnoringOtherApps:YES];
     [NSApp finishLaunching];
-    g_cb = cb;
+    g_L = L;
 
     float scale = [win backingScaleFactor];
-    window_message_init(cb, win, 0, w * scale, h * scale);
-    return (void*)win;
+    window_message_init(L, win, getLayer(win), 0, w * scale, h * scale);
+    return true;
 }
 
 static NSEvent* peek_event() {
@@ -284,7 +293,7 @@ static NSEvent* peek_event() {
 	];
 }
 
-static bool dispatch_event(struct ant_window_callback* cb, NSEvent* event) {
+static bool dispatch_event(lua_State* L, NSEvent* event) {
 	if (!event) {
 	    return false;
 	}
@@ -296,7 +305,7 @@ static bool dispatch_event(struct ant_window_callback* cb, NSEvent* event) {
         msg.delta = 0.5f * [event scrollingDeltaY];
         msg.x = g_mx;
         msg.y = g_my;
-        ant::window::input_message(cb, msg);
+        ant::window::input_message(L, msg);
         break;
     }
     case NSEventTypeMouseMoved: {
@@ -316,7 +325,7 @@ static bool dispatch_event(struct ant_window_callback* cb, NSEvent* event) {
         case NSEventTypeOtherMouseDragged: msg.what = ant::window::mouse_buttons::middle; break;
         default: msg.what = ant::window::mouse_buttons::none; break;
         }
-        ant::window::input_message(cb, msg);
+        ant::window::input_message(L, msg);
         break;
     }
     case NSEventTypeLeftMouseDown:
@@ -332,7 +341,7 @@ static bool dispatch_event(struct ant_window_callback* cb, NSEvent* event) {
         case NSEventTypeOtherMouseDown: msg.what = ant::window::mouse_button::middle; break;
         default: break;
         }
-        ant::window::input_message(cb, msg);
+        ant::window::input_message(L, msg);
         break;
     }
     case NSEventTypeLeftMouseUp:
@@ -348,7 +357,7 @@ static bool dispatch_event(struct ant_window_callback* cb, NSEvent* event) {
         case NSEventTypeOtherMouseUp: msg.what = ant::window::mouse_button::middle; break;
         default: break;
         }
-        ant::window::input_message(cb, msg);
+        ant::window::input_message(L, msg);
         break;
     }
     case NSEventTypeKeyDown:
@@ -358,7 +367,7 @@ static bool dispatch_event(struct ant_window_callback* cb, NSEvent* event) {
         msg.key = ToImGuiKey(key_code);
         msg.state = get_keyboard_state(event);
         msg.press = (eventType == NSEventTypeKeyDown) ? 1 : 0;
-        ant::window::input_message(cb, msg);
+        ant::window::input_message(L, msg);
         break;
     }
     default:
@@ -369,23 +378,26 @@ static bool dispatch_event(struct ant_window_callback* cb, NSEvent* event) {
     return true;
 }
 
-void peekwindow_close() {
+void window_close() {
 }
 
-bool peekwindow_peek_message() {
+bool window_peek_message() {
     if ([g_dg applicationHasTerminated]) {
         return false;
     }
     @autoreleasepool {
-        while (dispatch_event(g_cb, peek_event())) { }
+        while (dispatch_event(g_L, peek_event())) { }
     }
     return true;
 }
 
-void peekwindow_set_cursor(int cursor) {
+void window_set_cursor(int cursor) {
     //TODO
 }
 
-void peekwindow_set_title(bee::zstring_view title) {
+void window_set_title(bee::zstring_view title) {
     //TODO
+}
+
+void window_set_maxfps(float fps) {
 }

@@ -595,53 +595,57 @@ lRenderFrame(lua_State* L) {
 
 static int
 lRenderSetTexture(lua_State* L) {
-	Rml::TextureData* data = new Rml::TextureData();
+	Rml::TextureData texture_data;
 	if (lua_gettop(L) >= 4) {
-		data->handle = (Rml::TextureId)luaL_checkinteger(L, 2);
-		data->dimensions.w = (float)luaL_checkinteger(L, 3);
-		data->dimensions.h = (float)luaL_checkinteger(L, 4);
+		texture_data.handle = (Rml::TextureId)luaL_checkinteger(L, 2);
+		texture_data.dimensions.w = (float)luaL_checkinteger(L, 3);
+		texture_data.dimensions.h = (float)luaL_checkinteger(L, 4);
 	}
-	Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(data));
+	Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(texture_data));
     return 0;
 }
 
 static int
 lRenderSetLatticeTexture(lua_State* L) {
-	Rml::LatticeData* data = new Rml::LatticeData();
+	Rml::TextureData texture_data;
 	if (lua_gettop(L) >= 10) {
-		data->handle       = (Rml::TextureId)luaL_checkinteger(L, 2);
-		data->dimensions.w = (float)luaL_checkinteger(L, 3);
-		data->dimensions.h = (float)luaL_checkinteger(L, 4);
-		data->lattice.x1   = (float)luaL_checknumber(L, 5);
-		data->lattice.y1   = (float)luaL_checknumber(L, 6);
-		data->lattice.x2   = (float)luaL_checknumber(L, 7);
-		data->lattice.y2   = (float)luaL_checknumber(L, 8);
-		data->lattice.u    = (float)luaL_checknumber(L, 9);
-		data->lattice.v    = (float)luaL_checknumber(L, 10);
-		Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(data));
+		texture_data.handle       = (Rml::TextureId)luaL_checkinteger(L, 2);
+		texture_data.dimensions.w = (float)luaL_checkinteger(L, 3);
+		texture_data.dimensions.h = (float)luaL_checkinteger(L, 4);
+		texture_data.extra = Rml::TextureData::Lattice {
+			.x1 = (float)luaL_checknumber(L, 5),
+			.y1 = (float)luaL_checknumber(L, 6),
+			.x2 = (float)luaL_checknumber(L, 7),
+			.y2 = (float)luaL_checknumber(L, 8),
+			.u  = (float)luaL_checknumber(L, 9),
+			.v  = (float)luaL_checknumber(L, 10),
+		};
+		Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(texture_data));
 	}
-	Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(data));
-    return 0;
+	Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(texture_data));
+	return 0;
 }
 
 static int
 lRenderSetTextureAtlas(lua_State* L) {
-	Rml::AtlasData* data = new Rml::AtlasData();
+	Rml::TextureData texture_data;
 	if (lua_gettop(L) >= 12) {
-		data->handle           = (Rml::TextureId)luaL_checkinteger(L, 2);
-		data->dimensions.w     = (float)luaL_checkinteger(L, 3);
-		data->dimensions.h     = (float)luaL_checkinteger(L, 4);
-		data->uv_rect.origin.x   = (float)luaL_checknumber(L, 5);
-		data->uv_rect.origin.y   = (float)luaL_checknumber(L, 6);
-		data->uv_rect.size.w     = (float)luaL_checknumber(L, 7);
-		data->uv_rect.size.h     = (float)luaL_checknumber(L, 8);
-		data->vertex_factor.origin.x = (float)luaL_optnumber(L, 9, 0);
-		data->vertex_factor.origin.y = (float)luaL_optnumber(L, 10, 0);
-		data->vertex_factor.size.w   = (float)luaL_optnumber(L, 11, 1);
-		data->vertex_factor.size.h   = (float)luaL_optnumber(L, 12, 11);
-		Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(data));
+		texture_data.handle       = (Rml::TextureId)luaL_checkinteger(L, 2);
+		texture_data.dimensions.w = (float)luaL_checkinteger(L, 3);
+		texture_data.dimensions.h = (float)luaL_checkinteger(L, 4);
+		texture_data.extra = Rml::TextureData::Atlas {
+			.ux = (float)luaL_checknumber(L, 5),
+			.uy = (float)luaL_checknumber(L, 6),
+			.uw = (float)luaL_checknumber(L, 7),
+			.uh = (float)luaL_checknumber(L, 8),
+			.fx = (float)luaL_optnumber(L, 9, 0),
+			.fy = (float)luaL_optnumber(L, 10, 0),
+			.fw = (float)luaL_optnumber(L, 11, 1),
+			.fh = (float)luaL_optnumber(L, 12, 11),
+		};
+		Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(texture_data));
 	}
-	Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(data));
+	Rml::Texture::Set(lua_checkstdstring(L, 1), std::move(texture_data));
     return 0;
 }
 

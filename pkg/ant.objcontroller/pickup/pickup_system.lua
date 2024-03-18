@@ -7,6 +7,8 @@ local R         = world:clibs "render.render_material"
 local math3d	= require "math3d"
 local bgfx 		= require "bgfx"
 local icamera	= ecs.require "ant.camera|camera"
+local ivm		= ecs.require "ant.render|visible_mask"
+local irender	= ecs.require "ant.render|render"
 local renderpkg = import_package "ant.render"
 local fbmgr 	= renderpkg.fbmgr
 local sampler	= renderpkg.sampler
@@ -28,11 +30,6 @@ local function packeid_as_rgba(eid)
             ((eid & 0x0000ff00) >> 8) / 0xff,
             ((eid & 0x00ff0000) >> 16) / 0xff,
             ((eid & 0xff000000) >> 24) / 0xff}    -- rgba
-end
-
-local function find_camera(id)
-	local e <close> = world:entity(id, "camera:in")
-	return e.camera
 end
 
 local function cvt_clickpt(pt, ratio)
@@ -240,19 +237,19 @@ function pickup_sys:entity_init()
 end
 
 local function open_pickup(x, y, cb)
-	local e = w:first "pickup_queue pickup:in visible?out"
+	local e = w:first "pickup_queue pickup:in"
 	e.pickup.nextstep = "blit"
 	e.pickup.clickpt[1] = x
 	e.pickup.clickpt[2] = y
 	e.pickup.picked_callback = cb
-	e.visible = true
+	irender.set_visible(e, true)
 	w:submit(e)
 end
 
 local function close_pickup()
-	local e = w:first "pickup_queue pickup:in visible?out"
+	local e = w:first "pickup_queue pickup:in"
 	e.pickup.nextstep = nil
-	e.visible = false
+	irender.set_visible(e, false)
 	w:submit(e)
 end
 
@@ -329,8 +326,8 @@ local function create_pickup_state(srcstate, dststate)
 end
 
 function pickup_sys:entity_ready()
-	for e in w:select "filter_result visible_state:in render_object:update filter_material:in eid:in" do
-		if e.visible_state["pickup_queue"] then
+	for e in w:select "filter_result render_object:update filter_material:in eid:in" do
+		if ivm.check(e, "pickup_queue") then
 			local ro = e.render_object
 			local fm = e.filter_material
 

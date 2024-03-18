@@ -6,14 +6,14 @@ local mc, mu	= mathpkg.constant, mathpkg.util
 
 local icamera	= ecs.require "ant.camera|camera"
 local iom 		= ecs.require "ant.objcontroller|obj_motion"
-local ivs 		= ecs.require "ant.render|visible_state"
 local ientity 	= ecs.require "ant.entity|entity"
 local ilight 	= ecs.require "ant.render|light.light"
-local irq		= ecs.require "ant.render|render_system.renderqueue"
+local irq		= ecs.require "ant.render|renderqueue"
 local imaterial = ecs.require "ant.render|material"
 local imodifier = ecs.require "ant.modifier|modifier"
-local prefab_mgr = ecs.require "prefab_manager"
+local prefab_mgr= ecs.require "prefab_manager"
 local iviewport = ecs.require "ant.render|viewport.state"
+local irender	= ecs.require "ant.render|render"
 
 local cmd_queue = ecs.require "gizmo.command_queue"
 local utils 	= ecs.require "mathutils"
@@ -44,7 +44,6 @@ function gizmo:update()
 	self:update_scale()
 	self:updata_uniform_scale()
 	self:update_axis_plane()
-	inspector.update_ui()
 end
 
 function gizmo:set_target(eid)
@@ -203,7 +202,7 @@ local function create_arrow_widget(axis_root, axis_str)
 			"ant.render|render",
 		},
 		data = {
-			visible_state = "",
+			visible = false,
 			scene = {
 				s = {0.004, 0.1, 0.004},
 				r = local_rotator,
@@ -226,7 +225,7 @@ local function create_arrow_widget(axis_root, axis_str)
 			"ant.render|render",
 		},
 		data = {
-			visible_state = "",
+			visible = false,
 			scene = {s = {0.02, 0.03, 0.02, 0}, r = local_rotator, t = cone_t, parent = axis_root},
 			material = "/pkg/ant.resources/materials/singlecolor_nocull.material",
 			render_layer = "translucent",
@@ -304,7 +303,6 @@ function gizmo:update_scale()
 	iom.set_srt_matrix(rze, math3d.mul(get_mat(origin, cam_to_origin, mc.ZAXIS), math3d.matrix{s = gizmo.scale}))
 end
 
-local test_bone
 local ipl = ecs.require "ant.polyline|polyline"
 local geopkg = import_package "ant.geometry"
 local geolib = geopkg.geometry
@@ -432,7 +430,7 @@ function gizmo_sys:post_init()
 				"ant.scene|scene_object",
 			},
 			data = {
-				visible_state = "",
+				visible = false,
 				scene = scene or {},
 				material = "/pkg/ant.resources/materials/singlecolor_nocull.material",
 				mesh = "/pkg/ant.resources.binary/meshes/base/cube.glb|meshes/Cube_P1.meshbin",
@@ -461,7 +459,6 @@ function gizmo_sys:post_init()
 	create_scale_axis(gizmo.sz, {0, 0, gizmo_const.AXIS_LEN})
 	
     -- ientity.create_grid_entity(64, 64, 1, 1)
-	-- test_bone = ientity.create_bone_mesh("testbone", "/pkg/tools.editor/resource/materials/joint.material", {s = 5}, gizmo.rz.color, false)
 end
 local event_main_camera_changed = world:sub{"main_queue", "camera_changed"}
 
@@ -751,9 +748,13 @@ local function move_light_gizmo(x, y)
 		circle_centre = math3d.transform(mat, math3d.vector{0, 0, ilight.range(le)}, 1)
 	end
 	local lightPos = iom.get_position(le)
+	local info = hierarchy:get_node_info(light_gizmo.current_light)
 	if light_gizmo_mode == 4 then
 		local curpos = mouse_hit_plane({x, y}, {dir = gizmo_dir_to_world(click_dir_spot_light), pos = math3d.totable(circle_centre)})
-		ilight.set_outter_radian(le, 2.0 * math.atan(math3d.length(math3d.sub(curpos, circle_centre)), ilight.range(le)))
+		local value = 2.0 * math.atan(math3d.length(math3d.sub(curpos, circle_centre)), ilight.range(le))
+		ilight.set_outter_radian(le, value)
+		info.template.data.light.outter_radian = value
+		world:pub { "PatchEvent", light_gizmo.current_light, "/data/light/outter_radian", value }
 	elseif light_gizmo_mode == 5 then
 		local move_dir = math3d.sub(circle_centre, lightPos)
 		local ce <close> = world:entity(irq.main_camera(), "camera:in")
@@ -762,10 +763,16 @@ local function move_light_gizmo(x, y)
 		if math3d.length(math3d.sub(new_offset, lightPos)) < math3d.length(math3d.sub(init_offset, lightPos)) then
 			offset = -offset
 		end
-		ilight.set_range(le, last_spot_range + offset)
+		local value = last_spot_range + offset
+		ilight.set_range(le, value)
+		info.template.data.light.range = value
+		world:pub { "PatchEvent", light_gizmo.current_light, "/data/light/range", value }
 	else
 		local curpos = mouse_hit_plane({x, y}, {dir = gizmo_dir_to_world(click_dir_point_light), pos = math3d.totable(lightPos)})
-		ilight.set_range(le, math3d.length(math3d.sub(curpos, lightPos)))
+		local value = math3d.length(math3d.sub(curpos, lightPos))
+		ilight.set_range(le, value)
+    	info.template.data.light.range = value
+		world:pub { "PatchEvent", light_gizmo.current_light, "/data/light/range", value }
 	end
 	light_gizmo.update_gizmo()
 	light_gizmo.highlight(true)
@@ -789,7 +796,7 @@ local function show_rotate_fan(rot_axis, start_angle, delta_angle)
 			end
 			local e4num = math.floor(extra_angle * step_angle) * 3
 			ro4.ib_num = e4num
-			ivs.set_state(e4, "main_view", e4num > 0)
+			irender.set_visible(e4, e4num > 0)
 		end
 		e3_num = math.floor(delta_angle * step_angle + 1) * 3
 	else
@@ -805,7 +812,7 @@ local function show_rotate_fan(rot_axis, start_angle, delta_angle)
 				e4start = 0
 			end
 			ro4.ib_start, ro4.ib_num = e4start, e4num
-			ivs.set_state(e4, "main_view", e4num > 0)
+			irender.set_visible(e4, e4num > 0)
 		else
 			e3_num = math.floor(-delta_angle * step_angle + 1) * 3
 			e3_start = math.floor(start_angle * step_angle) * 3 - e3_num
@@ -819,8 +826,7 @@ local function show_rotate_fan(rot_axis, start_angle, delta_angle)
 	local ro3 = e3.render_object
 	ro3.ib_start, ro3.ib_num = e3_start, e3_num
 
-	local e3_visible = e3_num > 0
-	ivs.set_state(e3, "main_view", e3_visible)
+	irender.set_visible(e3, e3_num > 0)
 end
 
 local init_screen_offest = math3d.ref()

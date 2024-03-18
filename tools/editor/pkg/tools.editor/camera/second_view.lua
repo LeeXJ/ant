@@ -13,7 +13,7 @@ local INV_Z<const> = true
 local INF_F<const> = true
 local math3d    = require "math3d"
 
-local irq       = ecs.require "ant.render|render_system.renderqueue"
+local irq       = ecs.require "ant.render|renderqueue"
 local queuemgr  = ecs.require "ant.render|queue_mgr"
 local icamera   = ecs.require "ant.camera|camera"
 local imaterial = ecs.require "ant.render|material"
@@ -194,7 +194,7 @@ local function create_frustum_entity(eid)
             material = "/pkg/ant.resources/materials/line_color.material",
             render_layer = "translucent",
             scene = { parent = frustum_root },
-            visible_state = "main_view",
+            visible = true,
             second_view_frustum = true,
         },
         tag = {
@@ -221,7 +221,7 @@ local function create_frustum_entity(eid)
             },
             owned_mesh_buffer = true,
             material = "/pkg/ant.resources/materials/singlecolor.material",
-            visible_state = "main_view",
+            visible = true,
             scene = {
                 t = tri_bottomcenter,
                 parent = frustum_root

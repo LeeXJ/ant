@@ -5,6 +5,8 @@ local w = world.w
 local bgfx = require "bgfx"
 local fbmgr = require "framebuffer_mgr"
 local icamera = ecs.require "ant.camera|camera"
+local irender = ecs.require "ant.render|render"
+
 local irq = {}
 
 local function get_rt(queuename)
@@ -166,10 +168,9 @@ end
 local bc_mb = world:sub{"bind_camera"}
 
 function irq.set_visible(queuename, b)
-	local e = w:first(queuename .." visible?out")
-	e.visible = b
+	local e = w:first(queuename)
+	irender.set_visible(e, b)
 	w:submit(e)
-	world:pub{"queue_visible_changed", queuename, b}
 end
 
 function irq.update_rendertarget(queuename, rt, need_touch)

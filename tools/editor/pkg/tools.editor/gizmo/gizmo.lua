@@ -3,9 +3,10 @@ local world = ecs.world
 local w = world.w
 
 local imaterial = ecs.require "ant.render|material"
-local ivs = ecs.require "ant.render|visible_state"
-local math3d = require "math3d"
-local gizmo_const = require "gizmo.const"
+local irender	= ecs.require "ant.render|render"
+
+local math3d 		= require "math3d"
+local gizmo_const 	= require "gizmo.const"
 local gizmo = {
     mode = gizmo_const.SELECT,
 	scale = 1.0,
@@ -68,8 +69,7 @@ end
 
 local function set_visible(eid, b)
 	local e <close> = world:entity(eid)
-	ivs.set_state(e, "main_view", b)
-	ivs.set_state(e, "selectable", b)
+	irender.set_visible(e, b)
 end
 
 function gizmo:click_axis(axis)

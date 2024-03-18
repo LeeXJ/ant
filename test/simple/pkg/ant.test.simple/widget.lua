@@ -2,9 +2,9 @@ local ecs = ...
 local world = ecs.world
 
 local ImGui = require "imgui"
-local ivs = ecs.require "ant.render|visible_state"
-local ianimation = ecs.require "ant.animation|animation"
-local iplayback = ecs.require "ant.animation|playback"
+local ianimation    = ecs.require "ant.animation|animation"
+local iplayback     = ecs.require "ant.animation|playback"
+local irender       = ecs.require "ant.render|render"
 
 local m = {}
 
@@ -30,12 +30,11 @@ function m.AnimationView(tags)
         if ImGui.TreeNode "mesh" then
             for i = 1, #entities do
                 local eid = entities[i]
-                local e <close> = world:entity(eid, "render_object?in animation?in")
+                local e <close> = world:entity(eid, "render_object?in animation?in visible?in")
                 if e.render_object then
-                    local value = { ivs.has_state(e, "main_view") }
+                    local value = { e.visible }
                     if ImGui.Checkbox(names[eid], value) then
-                        ivs.set_state(e, "main_view", value[1])
-                        ivs.set_state(e, "cast_shadow", value[1])
+                        irender.set_visible(e, value[1])
                     end
                 end
                 if e.animation then

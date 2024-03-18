@@ -7,9 +7,7 @@ local setting   = import_package "ant.settings"
 local ENABLE_FXAA<const> = setting:get "graphic/postprocess/fxaa/enable"
 local ENABLE_TAA<const> = setting:get "graphic/postprocess/taa/enable"
 
-local ivs           = ecs.require "ant.render|visible_state"
 local sd_sys        = ecs.system "scene_depth_system"
-local R             = world:clibs "render.render_material"
 local queuemgr      = ecs.require "queue_mgr"
 local iviewport = ecs.require "ant.render|viewport.state"
 
@@ -26,7 +24,7 @@ local sampler   = import_package "ant.render.core".sampler
 local fbmgr     = require "framebuffer_mgr"
 
 
-local irq       = ecs.require "ant.render|render_system.renderqueue"
+local irq       = ecs.require "ant.render|renderqueue"
 function sd_sys:init()
     --make "scene_depth_queue" with the same 'material_index' of "pre_depth_queue"
     queuemgr.register_queue("scene_depth_queue", queuemgr.material_index "pre_depth_queue")

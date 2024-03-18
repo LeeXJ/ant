@@ -14,8 +14,10 @@ local layoutmgr		= require "vertexlayout_mgr"
 
 local hwi			= import_package "ant.hwi"
 local sampler		= import_package "ant.render.core".sampler
-local iviewport		= ecs.require "ant.render|viewport.state"
 local ED 			= world:clibs "entity.drawer"
+
+local ig			= ecs.require "ant.group|group"
+local ivm			= ecs.require "visible_mask"
 local queuemgr		= ecs.require "queue_mgr"
 
 local LAYER_NAMES<const> = {"foreground", "opacity", "background", "translucent", "decal_stage", "ui_stage"}
@@ -259,6 +261,37 @@ function irender.read_render_buffer_content(format, rb_idx, force_read, size)
 	return memory_handle, size.w, size.h, size.w * elem_size
 end
 
+function irender.set_visible_by_eid(eid, visible)
+	local e <close> = world:entity(eid, "visible?out")
+	e.visible = visible
+end
+
+function irender.set_visible(e, visible)
+	w:extend(e, "visible?out")
+	e.visible = visible
+end
+
+function irender.is_visible(e)
+	w:extend(e, "visible?in")
+	return e.visible
+end
+
+function irender.set_castshadow(e, cast)
+	ivm.set_masks(e, "cast_shadow", cast)
+end
+
+function irender.is_castshadow(e)
+	return ivm.check(e, "cast_shadow")
+end
+
+function irender.set_selectable(e, s)
+	ivm.set_masks(e, "selectable", s)
+end
+
+function irender.is_selectable(e)
+	return ivm.check(e, "selectable")
+end
+
 --[[
 	1 ---- 3
 	|      |
@@ -352,12 +385,29 @@ function irender.create_depth_state(os)
     end
 end
 
-function irender.group_flush(go)
+function irender.create_write_state(os)
+    local s = irender.has_depth_test(os)
+    if s and not s.BLEND then
+        s.DEPTH_TEST = "GREATER"
+		s.WRITE_MASK = "RGBAZ"
+        return bgfx.make_state(s)
+    end
+end
+
+local function group_filter_flush(go)
 	go:flush()
     go:filter("render_object_visible", "render_object")
     go:filter("hitch_visible", "hitch")
-
 	--go:filter("efk_visible", "efk")
+end
+
+irender.group_flush = group_filter_flush
+
+function irender.group_obj(tag)
+	local go = ig.obj(tag)
+	assert(not go.filter_flush)
+	go.filter_flush = group_filter_flush
+	return go
 end
 
 local RA_FMT<const> = "HBB"

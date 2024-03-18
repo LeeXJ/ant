@@ -2,27 +2,29 @@ local ecs = ...
 local world = ecs.world
 local fs        = require "filesystem"
 local fastio    = require "fastio"
-local iani      = ecs.require "ant.anim_ctrl|state_machine"
-local ivs       = ecs.require "ant.render|visible_state"
-local iefk      = ecs.require "ant.efk|efk"
-local itl       = ecs.require "ant.timeline|timeline"
+local iani          = ecs.require "ant.anim_ctrl|state_machine"
+local iefk          = ecs.require "ant.efk|efk"
+local itl           = ecs.require "ant.timeline|timeline"
 local keyframe_view = ecs.require "widget.keyframe_view"
-local prefab_mgr = ecs.require "prefab_manager"
-local hierarchy = ecs.require "hierarchy_edit"
-local assetmgr  = import_package "ant.asset"
-local ImGui     =  require "imgui"
-local icons     = require "common.icons"
-local logger    = require "widget.log"
-local ImGuiWidgets = require "imgui.widgets"
-local uiconfig  = require "widget.config"
-local uiutils   = require "widget.utils"
-local joint_utils = require "widget.joint_utils"
-local utils     = require "common.utils"
-local faicons   = require "common.fa_icons"
-local fmod      = require "fmod"
-local global_data = require "common.global_data"
-local iaudio     = import_package "ant.audio"
-local access    = global_data.repo_access
+local prefab_mgr    = ecs.require "prefab_manager"
+local hierarchy     = ecs.require "hierarchy_edit"
+local irender       = ecs.require "ant.render|render"
+
+local ImGui         = require "imgui"
+local icons         = require "common.icons"
+local logger        = require "widget.log"
+local ImGuiWidgets  = require "imgui.widgets"
+local uiconfig      = require "widget.config"
+local uiutils       = require "widget.utils"
+local joint_utils   = require "widget.joint_utils"
+local utils         = require "common.utils"
+local faicons       = require "common.fa_icons"
+local fmod          = require "fmod"
+local global_data   = require "common.global_data"
+
+local assetmgr      = import_package "ant.asset"
+local iaudio        = import_package "ant.audio"
+local access        = global_data.repo_access
 
 local edit_timeline
 local timeline_eid
@@ -293,7 +295,7 @@ local function show_current_event()
                 bank_path = (lfs.path('/') / lfs.relative(filename:match("^(.+/)[%w*?_.%-]*$"), global_data.project_root)):string()
                 if not mount_sound_flag[bank_path] then
                     mount_sound_flag[bank_path] = true
-                    utils.mount_memfs(bank_path)
+                    -- utils.mount_memfs(bank_path)
                     local bank_files = {
                         bank_path .. "/Master.strings.bank",
                         bank_path .. "/Master.bank"
@@ -537,10 +539,8 @@ local function show_skeleton(b)
     end
     for _, joint in ipairs(joints_list) do
         if joint.bone_mesh then
-            local e <close> = world:entity(joint.bone_mesh[1])
-            ivs.set_state(e, "main_view", b)
-            local be <close> = world:entity(joint.bone_mesh[2])
-            ivs.set_state(be, "main_view", b)
+            irender.set_visible_by_eid(joint.bone_mesh[1], b)
+            irender.set_visible_by_eid(joint.bone_mesh[2], b)
         end
     end
     joint_utils.show_skeleton = b
@@ -596,15 +596,22 @@ end
 function m.get_title()
     return "Animation"
 end
-
+local function play_or_pause()
+    if not edit_timeline then
+        if anim_state.is_playing then
+            iani.pause(anim_eid, true, current_anim.name)
+        else
+            iani.play(anim_eid, {name = current_anim.name, loop = ui_loop[1], speed = ui_speed[1]})
+        end
+    else
+        play_timeline()
+    end
+end
 function m.show()
     for _, action, path in event_keyframe:unpack() do
         if action == "effect" then
             if not effect_map[path] then
-                effect_map[path] = iefk.create(path, {
-                    scene = {},
-                    visible_state = "main_queue",
-                })
+                effect_map[path] = iefk.create(path)
             else
                 local e <close> = world:entity(effect_map[path], "efk:in")
                 iefk.play(e)
@@ -720,15 +727,7 @@ function m.show()
         local icon = anim_state.is_playing and icons.ICON_PAUSE or icons.ICON_PLAY
         local imagesize = icon.texinfo.width * icons.scale
         if ImGui.ImageButton("##play", assetmgr.textures[icon.id], imagesize, imagesize) then
-            if not edit_timeline then
-                if anim_state.is_playing then
-                    iani.pause(anim_eid, true, current_anim.name)
-                else
-                    iani.play(anim_eid, {name = current_anim.name, loop = ui_loop[1], speed = ui_speed[1]})
-                end
-            else
-                play_timeline()
-            end
+            play_or_pause()
         end
         ImGui.SameLine()
         if ImGui.Checkbox("loop", ui_loop) then
@@ -808,6 +807,7 @@ function m.show()
             on_move_clip(move_type, anim_state.selected_clip_index, move_delta)
         end
         ImGui.Separator()
+        -- ImGui.GetIO().WantCaptureMouse = true
         if ImGui.BeginTable("EventColumns", edit_timeline and 2 or 3, ImGui.TableFlags {'Resizable', 'ScrollY'}) then
             if not edit_timeline then
                 ImGui.TableSetupColumnEx("Bones", ImGui.TableColumnFlags {'WidthStretch'}, 1.0)
@@ -874,34 +874,33 @@ function m.on_target(eid)
     stop_timeline()
     edit_timeline = nil
     timeline_eid = nil
-    if not eid then
-        return
-    end
-    local e <close> = world:entity(eid, "timeline?in")
-    if e.timeline then
-        if not e.timeline.eid_map then
-            e.timeline.eid_map = prefab_mgr.current_prefab.tag
+    if eid then
+        local e <close> = world:entity(eid, "timeline?in")
+        if e.timeline then
+            if not e.timeline.eid_map then
+                e.timeline.eid_map = prefab_mgr.current_prefab.tag
+            end
+            
+            timeline_eid = eid
+            edit_timeline = {
+                dirty = true
+            }
+            edit_timeline["timeline"] = {
+                name = "timeline",
+                duration = e.timeline.duration,
+                key_event = from_runtime_event(e.timeline.key_event),
+            }
+            local frame = math.floor(e.timeline.duration * sample_ratio)
+            ui_loop[1] = e.timeline.loop
+            ui_timeline_duration[1] = frame
+            local current_timeline = edit_timeline["timeline"]
+            anim_state.anim_name = current_timeline.name
+            anim_state.key_event = current_timeline.key_event
+            anim_key_event = current_timeline.key_event
+            anim_state.duration = current_timeline.duration
+            anim_state.current_frame = 0
+            set_event_dirty(-1)
         end
-        
-        timeline_eid = eid
-        edit_timeline = {
-            dirty = true
-        }
-        edit_timeline["timeline"] = {
-            name = "timeline",
-            duration = e.timeline.duration,
-            key_event = from_runtime_event(e.timeline.key_event),
-        }
-        local frame = math.floor(e.timeline.duration * sample_ratio)
-        ui_loop[1] = e.timeline.loop
-        ui_timeline_duration[1] = frame
-        local current_timeline = edit_timeline["timeline"]
-        anim_state.anim_name = current_timeline.name
-        anim_state.key_event = current_timeline.key_event
-        anim_key_event = current_timeline.key_event
-        anim_state.duration = current_timeline.duration
-        anim_state.current_frame = 0
-        set_event_dirty(-1)
     elseif current_anim then
         anim_state.anim_name = current_anim.name
         anim_state.key_event = current_anim.key_event
@@ -936,5 +935,9 @@ function m:handle_event()
         self.clear()
     end
 end
-
+function m.handle_input(key, press, state)
+    if key == "Space" and press == 1 then
+        play_or_pause()
+    end
+end
 return m

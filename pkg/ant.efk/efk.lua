@@ -6,7 +6,8 @@ local math3d    = require "math3d"
 local fs        = require "filesystem"
 local lefk      = require "efk"
 local efkasset  = require "asset"
-
+local bgfx      = require "bgfx"
+local btime     = require "bee.time"
 local renderpkg = import_package "ant.render"
 local fbmgr     = renderpkg.fbmgr
 local assetmgr  = import_package "ant.asset"
@@ -18,16 +19,21 @@ local aio       = import_package "ant.io"
 local Q         = world:clibs "render.queue"
 
 local itimer    = ecs.require "ant.timer|timer_system"
-local ivs       = ecs.require "ant.render|visible_state"
 local queuemgr  = ecs.require "ant.render|queue_mgr"
 local ilight    = ecs.require "ant.render|light.light"
 local iviewport = ecs.require "ant.render|viewport.state"
-local irq       = ecs.require "ant.render|render_system.renderqueue"
+local irq       = ecs.require "ant.render|renderqueue"
+local ivm       = ecs.require "ant.render|visible_mask"
 local iom       = ecs.require "ant.objcontroller|obj_motion"
+local ifg       = ecs.require "ant.render|postprocess.postprocess"
+local irender   = ecs.require "ant.render|render"
 
 local efk_sys   = ecs.system "efk_system"
 local RC        = world:clibs "render.cache"
-
+local sampler   = import_package "ant.render.core".sampler
+local setting   = import_package "ant.settings"
+local ENABLE_TAA<const>     = setting:get "graphic/postprocess/taa/enable"
+local blit_viewid <const> = hwi.viewid_get "tonemapping_blit"
 local effect_viewid <const> = hwi.viewid_get "effect_view"
 
 local ltask = require "ltask"
@@ -74,11 +80,11 @@ local function shutdown()
 end
 
 local check_release_efks; do
-    local last = ltask.walltime()
+    local last = btime.monotonic()
 
     local checktime<const> = 1000
     function check_release_efks()
-        local now = ltask.walltime()
+        local now = btime.monotonic()
         local d = now - last
         if d >= checktime then
             last = now
@@ -111,12 +117,25 @@ local function init_efk()
     EFKCTX_HANDLE = EFKCTX
 end
 
-local function create_fb()
-    local tmq = w:first "tonemapping_queue render_target:in"
+local function create_fb(vr)
     local mq = w:first "main_queue render_target:in"
-    return fbmgr.create(
-        {rbidx = fbmgr.get(tmq.render_target.fb_idx)[1].rbidx},
-        {rbidx = fbmgr.get(mq.render_target.fb_idx)[2].rbidx})
+    local minmag_flag<const> = ENABLE_TAA and "POINT" or "LINEAR"
+    local rbidx = fbmgr.create_rb{
+        w = vr.w, h = vr.h, layers = 1,
+        format = "RGBA8",
+        flags = sampler{
+            U = "CLAMP",
+            V = "CLAMP",
+            MIN=minmag_flag,
+            MAG=minmag_flag,
+            RT="RT_ON",
+            BLIT="BLIT_AS_DST"
+        }    
+    }
+    local fbidx = fbmgr.create({rbidx = rbidx},{rbidx = fbmgr.get(mq.render_target.fb_idx)[2].rbidx})
+    local handle = fbmgr.get_rb(fbidx, 1).handle
+    ifg.set_stage_output("effect", handle)
+    return fbidx
 end
 
 local need_update_cb_data = true
@@ -148,7 +167,7 @@ function efk_sys:init_world()
             render_target = {
                 view_rect = {x=vr.x, y=vr.y, w=vr.w, h=vr.h},
                 viewid = effect_viewid,
-                fb_idx = create_fb(),
+                fb_idx = create_fb(vr),
                 view_mode = "s",
                 clear_state = {clear = "",},
             },
@@ -195,12 +214,14 @@ local function init_efk_component(efk)
     efk.speed       = efk.speed or 1.0
     efk.startframe  = efk.startframe or 0
     efk.fadeout     = efk.fadeout or false
+    efk.time        = efk.time or 0
     efk.handle      = create_efk(efk.path)
     efk.play_handle = createPlayHandle(efk.handle, efk.speed, efk.startframe, efk.fadeout)
 end
 
 local function init_efk_object(eo)
     eo.visible_idx = Q.alloc()
+    ivm.set_masks_by_idx(eo.visible_idx, "efk_queue", true)
 end
 
 function efk_sys:component_init()
@@ -251,8 +272,8 @@ local function update_cb_data(projmat)
         m33, m34,
         m43, m44,
     }
-
-    efkasset.update_cb_data(fb[1].handle, depth)
+    local last_output = ifg.get_last_output("effect")
+    efkasset.update_cb_data(last_output, depth)
 end
 
 function efk_sys:camera_usage()
@@ -260,8 +281,12 @@ function efk_sys:camera_usage()
         need_update_cb_data = true
     end
 
-    for _ in mq_vr_mb:each() do
+    for _, _, vr in mq_vr_mb:unpack() do
         need_update_cb_data = true
+        irq.set_view_rect("efk_queue", vr)
+        local q = w:first "efk_queue render_target:in"
+        local handle = fbmgr.get_rb(q.render_target.fb_idx, 1).handle
+        ifg.set_stage_output("effect", handle)
     end
 
     local C = irq.main_camera_changed()
@@ -305,12 +330,6 @@ function efk_sys:follow_scene_update()
 		e.efk_object.worldmat = e.scene.worldmat
 	end
 
-    for e in w:select "visible_state_changed efk_object:update efk:in visible_state:in" do
-        local visible = e.visible_state.main_queue and true or false
-        Q.set(e.efk_object.visible_idx, queuemgr.queue_index "efk_queue", visible)
-        e.efk.play_handle:set_visible(visible)
-    end
-
     local dl        = w:first "directional_light light:in scene:in"
     if dl then
         local direction, color = get_light_direction(dl), get_light_color(dl)
@@ -318,7 +337,7 @@ function efk_sys:follow_scene_update()
         EFKCTX:set_light_color(color)
     end
 
-    for e in w:select "efk_visible efk:in scene:in" do
+    for e in w:select "efk_visible visible efk:in scene:in" do
         local ph = e.efk.play_handle
         ph:update_transform(e.scene.worldmat)
     end
@@ -344,8 +363,18 @@ function efk_sys:render_preprocess()
     efk_render()
 end
 
+function efk_sys:tonemapping_blit()
+    local current_output = ifg.get_stage_output("effect")
+    local last_output = ifg.get_last_output("effect")
+    bgfx.blit(blit_viewid, current_output, 0, 0, last_output)
+end
+
 local iefk = {}
 function iefk.create(filename, config)
+    local visible = true
+    if config.visible ~= nil then
+        visible = config.visible
+    end
     return world:create_entity {
         group = config.group,
         policy = {
@@ -356,11 +385,11 @@ function iefk.create(filename, config)
             scene = config.scene or {},
             efk = {
                 path        = filename,
-                speed       = config.speed or 1.0,
-                time        = config.time or 0.0,
-                startframe  = config.startframe or 0,
+                speed       = config.speed,
+                time        = config.time,
+                startframe  = config.startframe,
             },
-            visible_state = config.visible_state,
+            visible         = visible,
         },
     }
 end
@@ -384,8 +413,8 @@ function iefk.set_speed(e, s)
 end
 
 function iefk.set_visible(e, b)
+    irender.set_visible(e, b)
     e.efk.play_handle:set_visible(b)
-    ivs.set_state(e, "main_queue", b)
 end
 
 function iefk.stop(e, delay)
