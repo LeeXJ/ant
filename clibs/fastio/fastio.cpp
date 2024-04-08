@@ -191,31 +191,6 @@ static int readall_f(lua_State *L) {
 }
 
 template <bool RAISE>
-static int readall_u(lua_State *L) {
-    const char* filename = getfile(L);
-    lua_settop(L, 2);
-    file_t f = file_t::open(L, filename);
-    if (!f.suc()) {
-        return raise_error<RAISE>(L, "open", getsymbol(L, filename));
-    }
-    size_t size = f.size();
-    void* data = lua_newuserdatauv(L, size, 0);
-    if (!data) {
-        f.close();
-        return luaL_error(L, "not enough memory");
-    }
-    size_t nr = f.read(data, size);
-    assert(nr == size);
-    if (nr != size) {
-        lua_pushlightuserdata(L, data);
-        lua_pushinteger(L, nr);
-        lua_rotate(L, -3, 2);
-        return 3;
-    }
-    return 1;
-}
-
-template <bool RAISE>
 static int readall_s(lua_State *L) {
     const char* filename = getfile(L);
     lua_settop(L, 2);
@@ -231,71 +206,6 @@ static int readall_s(lua_State *L) {
     }
     size_t nr = f.read(data, size);
     lua_pushlstring(L, (const char*)data, nr);
-    return 1;
-}
-
-struct LoadF {
-    int n;
-    FILE *f;
-    char buff[1024];
-};
-
-static const char* getF(lua_State *L, void *ud, size_t *size) {
-    LoadF* lf = (LoadF*)ud;
-    (void)L;
-    if (lf->n > 0) {
-        *size = lf->n;
-        lf->n = 0;
-    }
-    else { 
-        if (feof(lf->f)) return NULL;
-        *size = fread(lf->buff, 1, sizeof(lf->buff), lf->f);
-    }
-    return lf->buff;
-}
-
-struct LoadS {
-    const char *s;
-    size_t size;
-};
-
-static const char* getS(lua_State *L, void *ud, size_t *size) {
-    LoadS *ls = (LoadS *)ud;
-    (void)L;
-    if (ls->size == 0) return NULL;
-    *size = ls->size;
-    ls->size = 0;
-    return ls->s;
-}
-
-template <bool RAISE>
-static int loadfile(lua_State *L) {
-    const char* filename = getfile(L);
-    const char* symbol = getsymbol(L, filename);
-    lua_settop(L, 3);
-    file_t f = file_t::open(L, filename);
-    if (!f.suc()) {
-        return raise_error<RAISE>(L, "open", symbol);
-    }
-    LoadF lf;
-    lf.f = f.f;
-    lf.n = 0;
-    lua_pushfstring(L, "@%s", symbol);
-    int status = lua_load(L, getF, &lf, lua_tostring(L, -1), "t");
-    if (ferror(lf.f)) {
-        return raise_error<RAISE>(L, "read", symbol);
-    }
-    if (status != LUA_OK) {
-        luaL_pushfail(L);
-        lua_insert(L, -2);
-        return 2;
-    }
-    if (!lua_isnoneornil(L, 3)) {
-        lua_pushvalue(L, 3);
-        if (!lua_setupvalue(L, -2, 1)) {
-            lua_pop(L, 1);
-        }
-    }
     return 1;
 }
 
@@ -382,6 +292,20 @@ static int free(lua_State *L) {
     return 0;
 }
 
+struct LoadS {
+    const char *s;
+    size_t size;
+};
+
+static const char* getS(lua_State *L, void *ud, size_t *size) {
+    LoadS *ls = (LoadS *)ud;
+    (void)L;
+    if (ls->size == 0) return NULL;
+    *size = ls->size;
+    ls->size = 0;
+    return ls->s;
+}
+
 static int loadlua(lua_State* L) {
     luaL_checktype(L, 1, LUA_TLIGHTUSERDATA);
     memory_file* file = (memory_file*)lua_touserdata(L, 1);
@@ -413,10 +337,8 @@ luaopen_fastio(lua_State* L) {
         {"readall_v", readall_v<true>},
         {"readall_v_noerr", readall_v<false>},
         {"readall_f", readall_f<true>},
-        {"readall_u", readall_u<true>},
         {"readall_s", readall_s<true>},
         {"readall_s_noerr", readall_s<false>},
-        {"loadfile", loadfile<true>},
         {"sha1", sha1<true>},
         {"str2sha1", str2sha1},
         {"wrap", wrap},

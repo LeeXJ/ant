@@ -11,6 +11,7 @@ local TEXTUREC 		= require "tool_exe_path"("texturec")
 local shpkg			= import_package "ant.sh"
 local SH			= shpkg.sh
 local texcube		= import_package "ant.texture".cube
+local btime			= require "bee.time"
 
 local setting		= import_package "ant.settings"
 
@@ -80,7 +81,7 @@ local function writefile(filename, data)
 end
 
 local function is_png(path)
-	return path:equal_extension "png" ~= nil
+	return path:extension() == ".png"
 end
 
 local function gray2rgb(path, outfile)
@@ -114,8 +115,9 @@ end
 
 local function build_Eml(cm)
     print("start build irradiance SH, bandnum:", irradianceSH_bandnum)
+	local now = btime.monotonic()
     local Eml = SH.calc_Eml(cm, irradianceSH_bandnum)
-    print("finish build irradiance SH")
+    print("finish build irradiance SH, time used: ", btime.monotonic() - now, " ms")
     return Eml
 end
 
@@ -185,14 +187,14 @@ return function (output, setting, param)
 			return table.concat(t, " ")
 		end
 		buildcmd = to_command(commands)
-		local success, msg = subprocess.spawn_process(commands)
+		local success, errmsg = subprocess.spawn(commands)
 		if success then
-			if msg:upper():find("ERROR:", 1, true) then
+			if errmsg:upper():find("ERROR:", 1, true) then
 				success = false
 			end
 		end
 		if not success then
-			return false, msg
+			return false, errmsg
 		end
 		assert(lfs.exists(binfile))
 		local output_bin = output / "main.bin"

@@ -1,6 +1,6 @@
 local lm = require "luamake"
 
-lm:required_version "1.8"
+lm:required_version "1.9"
 --lm.luaversion = "lua55"
 
 local plat = (function ()
@@ -124,6 +124,7 @@ if lm.os ~= "ios" and lm.os ~= "android" then
             "gltf2ozz",
             "shaderc",
             "texturec",
+            "tools_version",
         }
     }
     lm:phony "all" {

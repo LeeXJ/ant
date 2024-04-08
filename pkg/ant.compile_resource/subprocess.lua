@@ -1,6 +1,5 @@
-local util = {}
 local ltask = require "ltask"
-local ServiceSubprocess = ltask.uniqueservice "ant.ltask|subprocess"
+local ServiceSubprocess = ltask.uniqueservice "ant.engine|subprocess"
 
 local function quote_arg(s)
     if #s == 0 then
@@ -62,13 +61,15 @@ local function normalize(commands)
     return table.concat(quote_cmds, " ")
 end
 
-function util.spawn_process(commands)
+local m = {}
+
+function m.spawn(commands)
     local cmdstring = normalize(commands)
     print(cmdstring)
     commands.stdout       = true
     commands.stderr       = "stdout"
     commands.hideWindow   = true
-    local errcode, errmsg = ltask.call(ServiceSubprocess, "run", commands)
+    local errcode, errmsg = ltask.call(ServiceSubprocess, "spawn", commands)
     local ok              = false
     local msg             = {}
     msg[#msg + 1]         = "----------------------------"
@@ -86,4 +87,4 @@ function util.spawn_process(commands)
     return ok, table.concat(msg, "\n")
 end
 
-return util
+return m

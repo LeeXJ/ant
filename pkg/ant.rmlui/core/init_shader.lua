@@ -14,7 +14,7 @@ local shaders <const> = {
     debug_draw      = "/pkg/ant.rmlui/materials/debug_draw.material",
 }
 
-local ServiceResource = ltask.uniqueservice "ant.resource_manager|resource"
+local ServiceResource = ltask.queryservice "ant.resource_manager|resource"
 local progs = {}
 local uniforms = {}
 local tasks = {}
@@ -30,7 +30,10 @@ for k, v in pairs(shaders) do
         progs[k] = shader.fx.prog
     end}
 end
-for _ in ltask.parallel(tasks) do
+for _, resp in ltask.parallel(tasks) do
+    if resp.error then
+        resp:rethrow()
+    end
 end
 progs.uniforms = uniforms
 return progs

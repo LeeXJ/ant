@@ -8,6 +8,8 @@ local ENABLE_PRE_DEPTH<const>	= not setting:get "graphic/disable_pre_z"
 local ENABLE_FXAA<const> 		= setting:get "graphic/postprocess/fxaa/enable"
 local ENABLE_TAA<const>			= setting:get "graphic/postprocess/taa/enable"
 
+local INV_Z<const> = setting:get "graphic/inv_z"
+local CLEAR_DEPTH_VALUE<const>  = INV_Z and 0 or 1
 local bgfx 			= require "bgfx"
 local fbmgr			= require "framebuffer_mgr"
 local layoutmgr		= require "vertexlayout_mgr"
@@ -73,31 +75,6 @@ if ENABLE_PRE_DEPTH then
 	default_clear_state.clear = "C"
 end
 
-function irender.create_view_queue(view_rect, view_queuename, camera_ref, filtertype, exclude, visible)
-	filtertype = filtertype or "main_view"
-
-	local fbidx = fbmgr.get_fb_idx(hwi.viewid_get "main_view")
-	world:create_entity {
-		policy = {
-			"ant.render|render_queue",
-			"ant.render|watch_screen_buffer",
-		},
-		data = {
-			camera_ref = assert(camera_ref),
-			render_target = {
-				viewid		= hwi.viewid_get(view_queuename),
-				clear_state	= default_clear_state,
-				view_rect	= {x=view_rect.x, y=view_rect.y, w=view_rect.w, h=view_rect.h, ratio=view_rect.ratio},
-				fb_idx		= fbidx,
-			},
-			[view_queuename]	= true,
-			queue_name			= view_queuename,
-			submit_queue		= true,
-			visible 			= visible or false,
-			watch_screen_buffer	= true,
-		}
-	}
-end
 
 local function create_depth_rb(ww, hh)
 	return fbmgr.create_rb{
@@ -131,7 +108,7 @@ function irender.create_pre_depth_queue(vr, camera_ref)
 				viewid = depth_viewid,
 				clear_state = {
 					clear = "SD",
-					depth = 0,
+					depth = CLEAR_DEPTH_VALUE,
 					stencil = 0
 				},
 				view_rect = {x=vr.x, y=vr.y, w=vr.w, h=vr.h, ratio=vr.ratio},
@@ -379,7 +356,7 @@ end
 function irender.create_depth_state(os)
     local s = irender.has_depth_test(os)
     if s and not s.BLEND then
-        s.DEPTH_TEST = "GREATER"
+        s.DEPTH_TEST = INV_Z and "GREATER" or "LESS"
 		s.WRITE_MASK = "Z"
         return bgfx.make_state(s)
     end
@@ -388,7 +365,7 @@ end
 function irender.create_write_state(os)
     local s = irender.has_depth_test(os)
     if s and not s.BLEND then
-        s.DEPTH_TEST = "GREATER"
+        s.DEPTH_TEST = INV_Z and "GREATER" or "LESS"
 		s.WRITE_MASK = "RGBAZ"
         return bgfx.make_state(s)
     end

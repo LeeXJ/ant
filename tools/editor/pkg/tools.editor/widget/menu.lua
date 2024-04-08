@@ -9,7 +9,6 @@ local editor_setting    = require "editor_setting"
 local ImGui             = require "imgui"
 local lfs               = require "bee.filesystem"
 local global_data       = require "common.global_data"
-local access            = global_data.repo_access
 local fs                = require "filesystem"
 local uiutils           = require "widget.utils"
 local faicons            = require "common.fa_icons"
@@ -20,7 +19,7 @@ local function show_select_light_dialog()
     if ImGui.MenuItem(faicons.ICON_FA_LIGHTBULB.." Light:".. lightprefab) then
         local prefab_filename = uiutils.get_open_file_path("Select Prefab", "prefab")
         if prefab_filename then
-            local filename = access.virtualpath(global_data.repo, prefab_filename)
+            local filename = global_data:lpath_to_vpath(prefab_filename)
             if filename and fs.exists(fs.path(filename)) then
                 editor_setting.setting.light = filename
                 editor_setting.save()
@@ -65,7 +64,7 @@ function m.show()
                 if rf then
                     for _, filepath in ipairs(editor_setting.setting.recent_files) do
                         if lfs.exists(lfs.path(filepath)) and ImGui.MenuItem(filepath) then
-                            world:pub{"OpenFile", filepath, lfs.path(filepath):equal_extension(".prefab")}
+                            world:pub{"OpenFile", filepath, lfs.path(filepath):extension() == ".prefab"}
                         end
                     end
                 end

@@ -25,7 +25,7 @@ function event.RUNTIME_CREATE(repo)
     local logdir = repo._root / '.log'
     lfs.create_directories(logdir)
     for path in lfs.pairs(logdir) do
-        if path:equal_extension ".log" then
+        if path:extension() == ".log" then
             lfs.create_directories(logdir / 'backup')
             lfs.rename(path, logdir / 'backup' / path:filename())
         end
@@ -86,7 +86,7 @@ function message.LOG(type, data)
 end
 
 local function connectFileServer()
-    local fd = assert(socket "tcp")
+    local fd = assert(socket.create "tcp")
     selector:event_add(fd, SELECT_WRITE)
     assert(fd:connect("127.0.0.1", 2019) ~= nil)
     for f, ev in selector:wait() do
@@ -96,31 +96,28 @@ local function connectFileServer()
     end
 end
 
-local function handleNetworkEvent(exfd)
+function m.handle_event()
     local reading_queue = {}
     local output = {}
-    selector:event_mod(exfd, SELECT_READ)
-    while true do
-        for fd, ev in selector:wait(0.001) do
-            if ev & SELECT_READ ~= 0 then
-                local reading = fd:recv()
-                if reading == nil then
-                    fd:close()
-                    break
-                elseif reading == false then
-                else
-                    table.insert(reading_queue, reading)
-                    while true do
-                        local msg = protocol.readmessage(reading_queue, output)
-                        if msg == nil then
-                            break
-                        end
-                        local f = message[msg[1]]
-                        if f then
-                            f(table.unpack(msg, 2))
-                        else
-                            error(msg[1])
-                        end
+    for fd, ev in selector:wait(1) do
+        if ev & SELECT_READ ~= 0 then
+            local reading = fd:recv()
+            if reading == nil then
+                fd:close()
+                break
+            elseif reading == false then
+            else
+                table.insert(reading_queue, reading)
+                while true do
+                    local msg = protocol.readmessage(reading_queue, output)
+                    if msg == nil then
+                        break
+                    end
+                    local f = message[msg[1]]
+                    if f then
+                        f(table.unpack(msg, 2))
+                    else
+                        error(msg[1])
                     end
                 end
             end
@@ -128,7 +125,8 @@ local function handleNetworkEvent(exfd)
     end
 end
 
-function m.run()
+function m.init(lua_path, repo_path)
+    luaexe, repopath = lua_path, repo_path
     local fd = connectFileServer()
     if not fd then
         spawnFileServer()
@@ -137,12 +135,8 @@ function m.run()
     else
         print("connect external fileserver")
     end
-    
-    handleNetworkEvent(fd)
+    selector:event_mod(fd, SELECT_READ)
+    m.fd = fd
 end
 
-return function()
-    luaexe, repopath = (cthread.channel "fileserver_channel"):bpop()
-    sender = cthread.channel "log_channel"
-    return m
-end
+return m

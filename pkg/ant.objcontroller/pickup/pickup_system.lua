@@ -14,6 +14,9 @@ local fbmgr 	= renderpkg.fbmgr
 local sampler	= renderpkg.sampler
 
 local assetmgr  = import_package "ant.asset"
+local featureset= import_package "ant.render".featureset
+
+local setting 	= import_package "ant.settings"
 
 local RM		= ecs.require "ant.material|material"
 
@@ -21,9 +24,7 @@ local hwi		= import_package "ant.hwi"
 
 local queuemgr  = ecs.require "ant.render|queue_mgr"
 
-local INV_Z<const> = true
-local INF_F<const> = true
-local pickup_material, pickup_skin_material
+local INV_Z<const> = setting:get "graphic/inv_z"
 
 local function packeid_as_rgba(eid)
     return {(eid & 0x000000ff) / 0xff,
@@ -222,10 +223,20 @@ local function create_pick_entity()
 	}
 end
 
+local FEATURE_MATERIALS = {}
+
+local function which_material(e)
+	w:extend(e, "feature_set:in")
+	assert(not e.feature_set.DRAW_INDIRECT, "Not support draw_indirect object to pickup")
+	local flag = featureset.flag_from_featureset(e.feature_set)
+	return assert(FEATURE_MATERIALS[flag], "Invalid feature_set")
+end
+
 function pickup_sys:init()
 	create_pick_entity()
-	pickup_material			= assetmgr.resource '/pkg/ant.objcontroller/pickup/assets/pickup_opacity.material'
-	pickup_skin_material	= assetmgr.resource '/pkg/ant.objcontroller/pickup/assets/pickup_opacity_skin.material'
+
+	FEATURE_MATERIALS[featureset.flag ""] 				= assetmgr.resource '/pkg/ant.objcontroller/pickup/assets/pickup_opacity.material'
+	FEATURE_MATERIALS[featureset.flag "GPU_SKINNING"]	= assetmgr.resource '/pkg/ant.objcontroller/pickup/assets/pickup_opacity_skin.material'
 end
 
 function pickup_sys:entity_init()
@@ -311,12 +322,6 @@ function pickup_sys:pickup()
 		end
 		check_next_step(pc)
 	end
-end
-
-local function which_material(e)
-	--NOTE: pickup system not supprt draw indirect, or we need pickup program generate from material compile??
-	w:extend(e, "skinning?in")
-    return e.skinning and pickup_skin_material or pickup_material
 end
 
 local function create_pickup_state(srcstate, dststate)

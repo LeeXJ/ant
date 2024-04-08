@@ -88,7 +88,7 @@ local content_text_types = {
 
 local function gen_get(fs)
 	local function get_file(path)
-		local ext = path:extension():string():lower()
+		local ext = path:extension()
 		local content = fs.reader(path:string())
 		local ctype = content_text_types[ext]
 		if not ctype then
@@ -148,11 +148,11 @@ local get_path = {}; do
 end
 
 local function get_directory(what)
-	local directory = require "directory"
+	local engine = import_package "ant.engine"
 	if what == "log" then
-		return directory.app_path():string()
+		return engine.app_path():string()
 	elseif what == "app" then
-		return directory.app_path():string()
+		return engine.app_path():string()
 	end
 end
 
