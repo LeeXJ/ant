@@ -69,3 +69,11 @@ return function (output, namespace, userheader, components)
     write ""
     writefile(output)
 end
+
+-- 这段 Lua 代码的功能是根据给定的组件信息生成 C++ 头文件。它包括以下主要步骤：
+
+-- 1. 生成头文件基本内容和命名空间。
+-- 2. 定义实体 ID 类型和各种类型的组件结构体。
+-- 3. 定义所有组件类型的元组。
+-- 4. 定义组件 ID 函数和重载版本。
+-- 5. 将生成的代码写入指定的输出文件中。
