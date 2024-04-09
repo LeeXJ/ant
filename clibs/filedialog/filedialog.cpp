@@ -199,3 +199,23 @@ int luaopen_filedialog(lua_State* L) {
     luaL_newlib(L, lib);
     return 1;
 }
+
+// 这段代码实现了一个 Lua C 模块，用于在 Windows 系统上打开和保存文件对话框。
+
+// 1. **字符串转换函数**：`u2w` 和 `w2u` 函数用于在 UTF-8 字符串和宽字符字符串之间进行转换。
+
+// 2. **Lua 辅助函数**：`towstring` 函数用于从 Lua 栈中获取字符串，`pushwstring` 函数用于将字符串推入 Lua 栈。
+
+// 3. **对话框设置函数**：`dlgSetTitle` 和 `dlgSetFileTypes` 函数根据 Lua 表中的设置，设置对话框的标题和文件类型。
+
+// 4. **获取父窗口句柄函数**：`dlgGetOwnerWindow` 函数从 Lua 表中获取父窗口句柄。
+
+// 5. **从选定的项中获取路径函数**：`dlgPushPathFromItem` 函数根据选定的项，获取文件路径并将其推入 Lua 栈。
+
+// 6. **创建文件对话框函数**：`lcreate` 函数根据传入的 Lua 表参数，创建文件打开或保存对话框，并根据结果将选定的文件路径推入 Lua 栈。
+
+// 7. **`lopen` 和 `lsave` 函数**：Lua 绑定函数，分别用于打开和保存文件对话框。
+
+// 8. **模块入口函数**：`luaopen_filedialog` 函数注册了所有的功能函数并返回 Lua 模块。
+
+// 该模块使用了 Windows API 提供的文件对话框接口，通过 Lua 脚本调用这些接口完成对话框的创建和操作。
