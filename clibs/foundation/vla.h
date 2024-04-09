@@ -139,3 +139,32 @@ vla_resize_(void *L, void **p, vla_handle_t *h, int n, int esize, int *lua_id) {
 
 	vla_close_handle(handle2);
 */
+
+// 这段代码实现了一个支持栈和堆上动态数组的库，并提供了方便的宏来简化使用。
+
+// 主要的结构体和联合包括：
+
+// - `struct vla_header`：动态数组头部的通用结构体，包含数组类型、大小和容量。
+// - `struct vla_stack`：栈上动态数组的结构体，包含了数组大小、容量和数据缓冲区，以及可能存在的额外句柄。
+// - `struct vla_heap`：堆上动态数组的结构体，包含了数组大小、容量和数据缓冲区。
+// - `struct vla_lua`：Lua 环境中动态数组的结构体，包含了数组大小、容量和数据缓冲区。
+// - `union vla_handle`：动态数组句柄的联合类型，可以指向不同类型的动态数组。
+
+// 主要的宏和函数包括：
+
+// - `vla_stack_new_`：创建栈上动态数组。
+// - `vla_heap_new`：创建堆上动态数组。
+// - `vla_lua_new`：创建 Lua 环境中的动态数组。
+// - `vla_new`：根据是否在 Lua 环境中创建动态数组。
+// - `vla_using_`：根据动态数组类型映射到对应的数据缓冲区。
+// - `vla_using`：创建动态数组的访问器。
+// - `vla_sync`：同步动态数组的数据缓冲区。
+// - `vla_handle_close_`：关闭动态数组。
+// - `vla_close_handle`：关闭动态数组句柄。
+// - `vla_handle_resize_`：调整动态数组的大小。
+// - `vla_resize_`：调整动态数组大小并映射到对应的数据缓冲区。
+// - `vla_size`：获取动态数组的大小。
+// - `vla_push`：向动态数组中添加元素。
+// - `vla_luaid`：获取动态数组在 Lua 环境中的 ID。
+
+// 通过这些宏和函数，用户可以方便地创建和管理栈和堆上的动态数组，并在需要时调整大小、添加元素和关闭动态数组。

@@ -210,3 +210,24 @@ vla_handle_resize_(void *L, vla_handle_t *h, int n, int esize, int *lua_id) {
 		break;
 	}
 }
+
+// 这段代码实现了一个动态数组的库，其中包含了针对堆、栈和 Lua 环境的不同实现。
+
+// 主要的结构体有：
+
+// - `struct vla_heap`：堆实现的动态数组结构体，包含了数组的容量、大小以及数据缓冲区。
+// - `struct vla_stack`：栈实现的动态数组结构体，除了包含了数组的容量、大小以及数据缓冲区外，还有一个额外的 `vla_handle_t` 字段，用于引用 Lua 环境的动态数组。
+// - `struct vla_lua`：Lua 环境的动态数组结构体，除了包含了数组的容量、大小以及数据缓冲区外，还有一个额外的 `lua_State*` 字段，用于引用 Lua 环境。
+
+// 主要函数包括：
+
+// - `vla_handle_close_`：关闭动态数组，释放内存。
+// - `vla_handle_map_`：将动态数组映射到一个指针。
+// - `vla_handle_resize_`：调整动态数组的大小。
+// - `vla_heap_new`：创建堆实现的动态数组。
+// - `vla_lua_new`：创建 Lua 环境的动态数组。
+// - `vla_resize_heap`：调整堆实现的动态数组的大小。
+// - `vla_resize_stack`：调整栈实现的动态数组的大小。
+// - `vla_resize_lua`：调整 Lua 环境的动态数组的大小。
+
+// 这些函数使得用户可以在不同的场景下创建和操作动态数组，包括堆、栈和 Lua 环境。
