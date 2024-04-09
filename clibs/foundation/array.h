@@ -101,3 +101,17 @@ array_resize_(lua_State *L, struct array_accessor *aa, struct array **ref, int n
  */
 
 #endif
+
+
+// 这是一个 C 语言头文件，定义了一个简单的动态数组结构以及一些操作动态数组的函数。该动态数组结构 `array` 包含两个字段：`cap` 表示数组的容量，`n` 表示数组的元素个数。同时，还定义了一个 `array_accessor` 结构体，用于访问动态数组的元素。
+
+// 该头文件提供了以下几个宏和函数：
+
+// - `array_init(uv_index, type)`: 初始化一个动态数组，并将其存储到 Lua 的 uservalue 中，以便在 Lua 中保持对其的引用。
+// - `array_using(rootv, field_name, root_index, uv_index, type)`: 定义一个动态数组的访问器，方便后续操作该动态数组。
+// - `array(rootv, field_name)`: 获取动态数组的指针。
+// - `array_resize(rootv, field_name, n)`: 调整动态数组的大小。
+// - `array_push(rootv, field_name, v)`: 在动态数组中压入一个新元素。
+// - `array_size(rootv, field_name)`: 获取动态数组的元素个数。
+
+// 使用示例和详细说明都包含在头文件的注释中。
