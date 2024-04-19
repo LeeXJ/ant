@@ -5,10 +5,6 @@
 #include "common/lightdata.sh"
 #include "common/camera.sh"
 
-#ifndef CLUSTER_MAX_LIGHT_COUNT
-#define CLUSTER_MAX_LIGHT_COUNT 8
-#endif //CLUSTER_MAX_LIGHT_COUNT
-
 struct light_grid{
     uint offset;
     uint count;
@@ -25,10 +21,11 @@ struct AABB {
 BUFFER_RW(b_cluster_AABBs,				vec4,	0);
 #	else// defined CLUSTER_LIGHT_CULL
 BUFFER_RO(b_cluster_AABBs,				vec4,	0);
-BUFFER_RW(b_global_index_count,			uint,	1);
-BUFFER_RW(b_light_grids_write,			uint,	2);
-BUFFER_RW(b_light_index_lists_write,	uint,	3);
-BUFFER_RO(b_light_info_for_cull,		vec4,	4);
+
+BUFFER_RW(b_light_grids_write,			uint,	1);
+BUFFER_RW(b_light_index_lists_write,	uint,	2);
+BUFFER_RO(b_light_info_for_cull,		vec4,	3);
+//BUFFER_RW(b_global_index_count,			uint,	4);
 #	endif //defined(CLUSTER_BUILD_AABB)
 
 #else //!(defined(CLUSTER_BUILD_AABB) || defined(CLUSTER_LIGHT_CULL))
@@ -43,23 +40,24 @@ uniform vec4 u_cluster_shading_param;
 #define u_slice_scale	u_cluster_shading_param.x
 #define u_slice_bias	u_cluster_shading_param.y
 #define u_tile_unit		u_cluster_shading_param.zw
+uniform mat4 u_normal_inv_proj;
 
 /**
 about the depth slice:
-	depth_slice = f(linearZ) = floor(
-		log(linearZ) * num_slice/log(far/near) - log(near) * num_slice/log(far/near)
+	depth_slice = f(zVS) = floor(
+		log(zVS) * num_slice/log(far/near) - log(near) * num_slice/log(far/near)
 	)
 	we can see 'num_slice/log(far/near)' and 'log(near) * num_slice/log(far/near)' are const in shader
 	so, we can calculate them in cpu, and make them as 'scale' and 'bias'
 
 	see below: which_cluster()
 where inverse function is:
-	linezeZ = F(depth_slice) = near * pow(far/near, depth_slice/num_slice)
+	zVS = F(depth_slice) = near * pow(far/near, depth_slice/num_slice)
 	see below: which_z()
 */
 
-uint which_cluster(vec2 screenxy, float linearZ){
-	uint cluster_z     = uint(max(log2(linearZ) * u_slice_scale + u_slice_bias, 0.0));
+uint which_cluster(vec2 screenxy, float zVS){
+	uint cluster_z     = uint(max(log2(zVS) * u_slice_scale + u_slice_bias, 0.0));
 	vec2 xy = screenxy - u_viewRect.xy;
     uvec3 cluster_coord= uvec3(xy/u_tile_unit, cluster_z);
     return 	cluster_coord.x +
@@ -70,6 +68,14 @@ uint which_cluster(vec2 screenxy, float linearZ){
 
 float which_z(uint depth_slice, uint num_slice){
 	return u_near*pow(u_far/u_near, depth_slice/float(num_slice));
+}
+
+uint cluster_index(uvec3 workgroupid, uvec3 threadsize, uint localindex)
+{
+    const uvec3 wgsize = uvec3(u_cluster_size.xyz) / threadsize;
+    const uint threadcount = threadsize.x * threadsize.y * threadsize.z;
+
+    return localindex + dot(uvec3(1, wgsize.x, wgsize.x*wgsize.y), workgroupid) * threadcount;
 }
 
 #define load_light_info(_BUF, _INDEX, _LIGHT){\

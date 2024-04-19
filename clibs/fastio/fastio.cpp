@@ -5,6 +5,9 @@
 #include <array>
 #include "memfile.h"
 
+#include <bee/utility/zstring_view.h>
+#include <bee/platform/win/cwtf8.h>
+
 extern "C" {
 #include "sha1.h"
 }
@@ -26,57 +29,49 @@ extern "C" {
 
 #if defined(_WIN32)
 #include <Windows.h>
-static wchar_t* u2w(lua_State* L, const char *str) {
-    int len = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
-    if (!len) {
-        luaL_error(L, "MultiByteToWideChar Failed: %d", GetLastError());
+static const wchar_t* u2w(lua_State* L, bee::zstring_view str) {
+    if (str.empty()) {
+        return L"";
+    }
+    size_t wlen = wtf8_to_utf16_length(str.data(), str.size());
+    if (wlen == (size_t)-1) {
+        luaL_error(L, "invalid wtf-8 string");
         return NULL;
     }
-    wchar_t* buf = (wchar_t*)lua_newuserdatauv(L, len * sizeof(wchar_t), 0);
-    if (!buf) {
+    wchar_t* wresult = (wchar_t*)lua_newuserdatauv(L, (wlen + 1) * sizeof(wchar_t), 0);
+    if (!wresult) {
         luaL_error(L, "not enough memory");
         return NULL;
     }
-    int out_len = MultiByteToWideChar(CP_UTF8, 0, str, -1, buf, len);
-    if (!out_len) {
-        luaL_error(L, "MultiByteToWideChar Failed: %d", GetLastError());
-        return NULL;
-    }
-    return buf;
+    wtf8_to_utf16(str.data(), str.size(), wresult, wlen);
+    wresult[wlen] = L'\0';
+    return wresult;
 }
 #endif
 
-struct file_t {
-    static file_t open(lua_State* L, const char* filename) {
+namespace fileutil {
+    static FILE* open(lua_State* L, bee::zstring_view filename) noexcept {
 #if defined(_WIN32)
-        return file_t { _wfopen(u2w(L, filename), L"rb") };
+        return _wfopen(u2w(L, filename), L"rb");
 #else
-        return file_t { fopen(filename, "r") };
+        return fopen(filename.data(), "r");
 #endif
     }
-    ~file_t() {
-        if (f) fclose(f);
-    }
-    void close() {
-        if (f) {
-            fclose(f);
-            f = NULL;
-        }
-    }
-    bool suc() const {
-        return !!f;
-    }
-    size_t size() {
+    static size_t size(FILE* f) noexcept {
         l_fseek(f, 0, SEEK_END);
         l_seeknum size = l_ftell(f);
         l_fseek(f, 0, SEEK_SET);
         return (size_t)size;
     }
-    size_t read(void* buf, size_t sz) {
+    static size_t read(FILE* f, void* buf, size_t sz) noexcept {
         return fread(buf, sizeof(char), sz, f);
     }
-    FILE* f;
-};
+    static void close(FILE* f) noexcept {
+        int rc = fclose(f);
+        (void)rc;
+        assert(rc == 0);
+    }
+}
 
 template <bool RAISE>
 static int raise_error(lua_State *L, const char* what, const char *filename) {
@@ -92,7 +87,7 @@ static int raise_error(lua_State *L, const char* what, const char *filename) {
     }
 }
 
-static const char* getfile(lua_State *L) {
+static bee::zstring_view getfile(lua_State *L) {
     if (lua_type(L, 1) != LUA_TSTRING) {
         if (lua_type(L, 2) == LUA_TSTRING) {
             luaL_error(L, "unable to decode filename: %s", lua_tostring(L, 2));
@@ -102,14 +97,16 @@ static const char* getfile(lua_State *L) {
         }
         return nullptr;
     }
-    return lua_tostring(L, 1);
+    size_t len      = 0;
+    const char* buf = lua_tolstring(L, 1, &len);
+    return { buf, len };
 }
 
-static const char* getsymbol(lua_State *L, const char* filename) {
+static const char* getsymbol(lua_State *L, bee::zstring_view filename) {
 #if defined(__ANT_RUNTIME__)
-    return luaL_optstring(L, 2, filename);
+    return luaL_optstring(L, 2, filename.data());
 #else
-    return filename;
+    return filename.data();
 #endif
 }
 
@@ -145,46 +142,50 @@ static int wrap_closure(lua_State* L) {
 
 template <bool RAISE>
 static int readall_v(lua_State *L) {
-    const char* filename = getfile(L);
+    auto filename = getfile(L);
     lua_settop(L, 2);
-    file_t f = file_t::open(L, filename);
-    if (!f.suc()) {
+    FILE* f = fileutil::open(L, filename);
+    if (!f) {
         return raise_error<RAISE>(L, "open", getsymbol(L, filename));
     }
-    size_t size = f.size();
+    size_t size = fileutil::size(f);
     auto file = memory_file_alloc(size);
     if (!file) {
-        f.close();
+        fileutil::close(f);
         return luaL_error(L, "not enough memory");
     }
-    size_t nr = f.read((void*)file->data, file->sz);
+    size_t nr = fileutil::read(f, (void*)file->data, file->sz);
     if (nr != size) {
         memory_file_close(file);
+        fileutil::close(f);
         return luaL_error(L, "unknown read error");
     }
+    fileutil::close(f);
     lua_pushlightuserdata(L, file);
     return 1;
 }
 
 template <bool RAISE>
 static int readall_f(lua_State *L) {
-    const char* filename = getfile(L);
+    auto filename = getfile(L);
     lua_settop(L, 2);
-    file_t f = file_t::open(L, filename);
-    if (!f.suc()) {
+    FILE* f = fileutil::open(L, filename);
+    if (!f) {
         return raise_error<RAISE>(L, "open", getsymbol(L, filename));
     }
-    size_t size = f.size();
+    size_t size = fileutil::size(f);
     auto file = memory_file_alloc(size);
     if (!file) {
-        f.close();
+        fileutil::close(f);
         return luaL_error(L, "not enough memory");
     }
-    size_t nr = f.read((void*)file->data, file->sz);
+    size_t nr = fileutil::read(f, (void*)file->data, file->sz);
     if (nr != size) {
         memory_file_close(file);
+        fileutil::close(f);
         return luaL_error(L, "unknown read error");
     }
+    fileutil::close(f);
     lua_pushlightuserdata(L, file);
     lua_pushcclosure(L, wrap_closure, 1);
     return 1;
@@ -192,19 +193,20 @@ static int readall_f(lua_State *L) {
 
 template <bool RAISE>
 static int readall_s(lua_State *L) {
-    const char* filename = getfile(L);
+    auto filename = getfile(L);
     lua_settop(L, 2);
-    file_t f = file_t::open(L, filename);
-    if (!f.suc()) {
+    FILE* f = fileutil::open(L, filename);
+    if (!f) {
         return raise_error<RAISE>(L, "open", getsymbol(L, filename));
     }
-    size_t size = f.size();
+    size_t size = fileutil::size(f);
     void* data = lua_newuserdatauv(L, size, 0);
     if (!data) {
-        f.close();
+        fileutil::close(f);
         return luaL_error(L, "not enough memory");
     }
-    size_t nr = f.read(data, size);
+    size_t nr = fileutil::read(f, data, size);
+    fileutil::close(f);
     lua_pushlstring(L, (const char*)data, nr);
     return 1;
 }
@@ -216,23 +218,24 @@ static char hex[] = {
 
 template <bool RAISE>
 static int sha1(lua_State *L) {
-    const char* filename = getfile(L);
+    auto filename = getfile(L);
     lua_settop(L, 2);
-    file_t f = file_t::open(L, filename);
-    if (!f.suc()) {
+    FILE* f = fileutil::open(L, filename);
+    if (!f) {
         return raise_error<RAISE>(L, "open", getsymbol(L, filename));
     }
     std::array<uint8_t, 1024> buffer;
     SHA1_CTX ctx;
     sat_SHA1_Init(&ctx);
     for (;;) {
-        size_t n = f.read(buffer.data(), buffer.size());
+        size_t n = fileutil::read(f, buffer.data(), buffer.size());
         if (n != buffer.size()) {
             sat_SHA1_Update(&ctx, buffer.data(), n);
             break;
         }
         sat_SHA1_Update(&ctx, buffer.data(), buffer.size());
     }
+    fileutil::close(f);
     std::array<uint8_t, SHA1_DIGEST_SIZE> digest;
     std::array<char, SHA1_DIGEST_SIZE*2> hexdigest;
     sat_SHA1_Final(&ctx, digest.data());

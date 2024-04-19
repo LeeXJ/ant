@@ -4,8 +4,10 @@ fx:
         "CLUSTER_BUILD_AABB=1"
     setting:
         lighting: off
+        threadsize: {1, 1, 1}
 properties:
     b_cluster_AABBs:
         stage: 0
         access: w
         buffer: "cluster_AABBs"
+    u_normal_inv_proj: {1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}

@@ -221,8 +221,8 @@ function BaseView:on_set_aabbmin(value)
                 end
                 bounding.aabb = math3d.mark(math3d.aabb(math3d.vector(tv), math3d.vector(aabbmax)))
                 e.scene_needchange = true
-                world:pub { "UpdateAABB", self.eid}
-                world:pub { "PatchEvent", self.eid, "/data/bounding/aabb", {tv, aabbmax} }
+                world:pub { "UpdateAABB", {self.eid}}
+                world:pub { "Patch", "", self.eid, "/data/bounding/aabb", {tv, aabbmax} }
             end
         end
     end
@@ -256,8 +256,8 @@ function BaseView:on_set_aabbmax(value)
                 end
                 bounding.aabb = math3d.mark(math3d.aabb(math3d.vector(aabbmin), math3d.vector(tv)))
                 e.scene_needchange = true
-                world:pub { "UpdateAABB", self.eid}
-                world:pub { "PatchEvent", self.eid, "/data/bounding/aabb", {aabbmin, tv} }
+                world:pub { "UpdateAABB", {self.eid}}
+                world:pub { "Patch", "", self.eid, "/data/bounding/aabb", {aabbmin, tv} }
             end
         end
     end
@@ -304,8 +304,8 @@ function BaseView:create_aabb()
         self.base.aabbmax:set_visible(true)
         self.base.aabbmin:update()
         self.base.aabbmax:update()
-        world:pub { "UpdateAABB", self.eid }
-        world:pub { "PatchEvent", self.eid, "/data/bounding/aabb", {min, max} }
+        world:pub { "UpdateAABB", {self.eid} }
+        world:pub { "Patch", "", self.eid, "/data/bounding/aabb", {min, max} }
     end
 end
 
@@ -323,8 +323,8 @@ function BaseView:delete_aabb()
         if bounding.aabb and bounding.aabb ~= mc.NULL then
             bounding.aabb = mc.NULL
         end
-        world:pub { "UpdateAABB", self.eid }
-        world:pub { "PatchEvent", self.eid, "/data/bounding/aabb" }
+        world:pub { "UpdateAABB", {self.eid}}
+        world:pub { "Patch", "", self.eid, "/data/bounding/aabb" }
     end
 end
 

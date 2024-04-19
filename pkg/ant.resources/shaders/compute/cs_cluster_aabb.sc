@@ -14,7 +14,7 @@ vec3 line_zplane_intersection(vec3 A, vec3 B, float zDistance){
 }
 
 vec3 screen2view(vec4 screen){
-    vec2 screen_ndc = (screen.xy / u_viewRect.xy);
+    vec2 screen_ndc = (screen.xy / u_viewRect.zw);
 #if !ORIGIN_BOTTOM_LEFT
     screen_ndc.y = 1.0 - screen_ndc.y;
 #endif //ORIGIN_BOTTOM_LEFT
@@ -22,7 +22,7 @@ vec3 screen2view(vec4 screen){
     screen_ndc = screen_ndc * 2.0 - 1.0;
 
     vec4 ndc = vec4(screen_ndc, screen.zw);
-    vec4 clip = mul(u_invProj, ndc);
+    vec4 clip = mul(u_normal_inv_proj, ndc);
     return clip.xyz / clip.w;
 }
 
@@ -44,10 +44,9 @@ vec3 max_vec(vec3 lhs, vec3 rhs)
     );
 }
 
-// dispatch as: [16, 9, 24]
-NUM_THREADS(1, 1, 1)
+NUM_THREADS(THREAD_NUM_X, THREAD_NUM_Y, THREAD_NUM_Z)
 void main(){
-    uint cluster_idx = dot(gl_WorkGroupID, uvec3(1, u_cluster_size.x, u_cluster_size.x * u_cluster_size.y));
+    const uint cluster_idx = cluster_index(gl_WorkGroupID, uvec3(THREAD_NUM_X, THREAD_NUM_Y, THREAD_NUM_Z), gl_LocalInvocationIndex);
 
 #if HOMOGENEOUS_DEPTH
     float near_sS = -1.0;
@@ -84,5 +83,8 @@ void main(){
 
     vec3 maxv = max_vec(tln, max_vec(trn, max_vec(bln, brn)));
     maxv = max_vec(maxv, max_vec(tlf, max_vec(trf, max_vec(blf, brf))));
+
+    //store_cluster_aabb2(b_cluster_AABBs, cluster_idx, vec4(0.0, 0.0, 0.0, 0.0), vec4(2.0, 2.0, 2.0, 0.0));
+    //TODO: make b_cluster_AABBs type as float not vec4, to remove minv.w and maxv.w
     store_cluster_aabb2(b_cluster_AABBs, cluster_idx, vec4(minv, 0.0), vec4(maxv, 0.0));
 }

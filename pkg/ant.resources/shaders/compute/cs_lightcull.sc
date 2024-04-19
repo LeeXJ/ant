@@ -8,40 +8,83 @@ float sphere_closest_pt_to_aabb(vec3 center, AABB aabb){
     return dot(d, d);
 }
 
-bool interset_aabb(light_info l, AABB aabb){
-    float boundsphere_radius = l.range;
-    vec3 center = mul(u_view, vec4(l.pos, 1.0)).xyz;
-    float sq_dist = sphere_closest_pt_to_aabb(center, aabb);
-    return sq_dist <= (boundsphere_radius * boundsphere_radius);
+vec3 aabb_center(AABB aabb){
+    return 0.5 * (aabb.minv + aabb.maxv);
 }
 
-#define NUM_X 16
-#define NUM_Y 9
-#define NUM_Z 3
+// https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
+float get_range_attenuation(float range, float dis)
+{
+    return saturate(1.0 - pow(dis / range, 4.0)) / (dis*dis);
+}
+// https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#inner-and-outer-cone-angles
+float get_spot_attenuation(vec3 pt2l, vec3 spotdir, float outter_cone, float inner_cone)
+{
+    float cosv = dot(normalize(spotdir), normalize(pt2l));
+    return smoothstep(outter_cone, inner_cone, cosv);	//outter_cone is less than inner_cone
+}
 
-#define WORKGORUP_SIZE  (16 * 9 * 3)
+float get_light_attenuation(light_info l, AABB aabb){
+    const vec3 clustercenter = aabb_center(aabb);
 
-NUM_THREADS(NUM_X, NUM_Y, NUM_Z)
+    const vec3 pt2l = clustercenter - l.pos;   //l.pos in viewspace
+    const float dis = length(pt2l);
+    const float attenuation = get_range_attenuation(l.range, dis);
+    if (IS_SPOT_LIGHT(l.type))
+    {
+        return attenuation * get_spot_attenuation(pt2l, l.dir, l.outter_cutoff, l.inner_cutoff);
+    }
+
+    return attenuation;
+}
+
+#define LIGHT_ATTENUATION_THRESHOLD 0.008
+bool check_light_valid(light_info l, AABB aabb){
+    const float attenuation = get_light_attenuation(l, aabb);
+    return (l.intensity * attenuation) > LIGHT_ATTENUATION_THRESHOLD;
+}
+
+bool check_light_interset_aabb(light_info l, AABB aabb){
+    if (check_light_valid(l, aabb)){
+        const float sq_dist = sphere_closest_pt_to_aabb(l.pos, aabb);
+        return sq_dist <= (l.range * l.range);
+    }
+    return false;
+}
+
+void transform_light(inout light_info l){
+    l.pos = mul(u_view, vec4(l.pos, 1.0)).xyz;
+}
+
+uint light_offset_idx()
+{
+    return u_all_light_count - u_culled_light_count;
+}
+
+//b_light_index_lists_write/b_light_index_lists used to keep which lights are visible right now.
+//it's a array<uint, num_clusters*u_cluster_max_light_count> buffer, so each cluster will occpy u_cluster_max_light_count uint buffer
+//I did not found any dynamic method to keep this buffer more compat
+
+
+//TODO: use shared data to transform all the light pos from worldspace to viewspace, to save ALU time
+NUM_THREADS(THREAD_NUM_X, THREAD_NUM_Y, THREAD_NUM_Z)
 void main(){
-    const uint lightcount = u_culled_light_count;
-    if (lightcount == 0)
+    if (u_culled_light_count == 0)
         return ;
-    uint cluster_idx = gl_LocalInvocationIndex + WORKGORUP_SIZE * gl_WorkGroupID.z;
+
+    const uint cluster_idx = cluster_index(gl_WorkGroupID, uvec3(THREAD_NUM_X, THREAD_NUM_Y, THREAD_NUM_Z), gl_LocalInvocationIndex);
+
     AABB aabb; load_cluster_aabb(b_cluster_AABBs, cluster_idx, aabb);
 
+    const uint offset = cluster_idx * u_cluster_max_light_count;
     uint visible_light_count = 0;
 
-    //TODO: need fix!!! make a more compat b_light_index_lists buffer
-    uint offset = cluster_idx * lightcount;
-    uint light_idx = has_directional_light() ? 1 : 0;
-    for( ; light_idx<lightcount; ++light_idx){
-        light_info l; load_light_info(b_light_info_for_cull, light_idx, l);
-
-        //TODO: need fix!!! b_light_index_lists update should use a barrier
-        if(interset_aabb(l, aabb)){
-            b_light_index_lists_write[offset+visible_light_count] = light_idx;
-            ++visible_light_count;
-            if (visible_light_count == CLUSTER_MAX_LIGHT_COUNT)
+    for(uint light_idx = light_offset_idx(); light_idx<u_all_light_count; ++light_idx){
+        light_info l = (light_info)0; load_light_info(b_light_info_for_cull, light_idx, l);
+        transform_light(l);
+        if(check_light_interset_aabb(l, aabb)){
+            b_light_index_lists_write[offset+visible_light_count++] = light_idx;
+            if (visible_light_count == u_cluster_max_light_count)
                 break;
         }
     }

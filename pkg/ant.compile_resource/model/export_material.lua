@@ -1,7 +1,5 @@
 local lfs = require "bee.filesystem"
 local utility = require "model.utility"
-local datalist = require "datalist"
-local vfs_fastio = require "vfs_fastio"
 local texture_compile = require "texture.compile"
 local parallel_task = require "parallel_task"
 
@@ -309,6 +307,8 @@ return function (status)
         local name = mat.name or tostring(matidx)
         local pbr_mr = mat.pbrMetallicRoughness
         local alphamode = mat.alphaMode or "OPAQUE"
+
+        local alpha_cutoff = mat.alphaCutoff or 1.0
         local material = {
             fx          = {shader_type = "PBR"},
             state       = get_state(alphamode),
@@ -323,7 +323,7 @@ return function (status)
                 u_pbr_factor         = {
                     pbr_mr.metallicFactor or 1.0,
                     pbr_mr.roughnessFactor or 1.0,
-                    mat.alphaCutoff or 1.0,
+                    alpha_cutoff,
                     1.0, --occlusion strength
                 },
             },
@@ -336,7 +336,7 @@ return function (status)
             macros[#macros+1] = "ALPHAMODE_OPAQUE=1"
             switch = "on"
         elseif alphamode == "MASK" then
-            macros[#macros+1] = "ALPHAMODE_MASK=" .. assert(mat.alphaCutoff)
+            macros[#macros+1] = "ALPHAMODE_MASK=" .. alpha_cutoff
         end
 
         setting.lighting        = switch

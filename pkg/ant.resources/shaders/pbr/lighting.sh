@@ -40,10 +40,8 @@ light_grid get_light_grid(in material_info mi)
 {
     light_grid g;
 #ifdef CLUSTER_SHADING
-	uint cluster_idx = which_cluster(mi.frag_coord.xy, mi.distanceVS);
-
-    uint cluster_count = u_cluster_size.x * u_cluster_size.y * u_cluster_size.z;
-    cluster_idx = clamp(cluster_idx, 0, cluster_count-1);
+    const uint cluster_count = u_cluster_size[3];
+    const uint cluster_idx = clamp(which_cluster(mi.frag_coord.xy, mi.distanceVS), 0, cluster_count-1);
 	load_light_grid(b_light_grids, cluster_idx, g);
 #else //!CLUSTER_SHADING
     g.offset = 0;
@@ -136,8 +134,7 @@ vec3 calc_direct_light(in material_info mi)
     {
         //TODO: other lights not check visibility right now
         light_grid g = get_light_grid(mi);
-        //const uint count = min(CLUSTER_MAX_LIGHT_COUNT, g.count);
-        const uint count = g.count; //see cs_lightcull.sc, limit g.count into CLUSTER_MAX_LIGHT_COUNT
+        const uint count = g.count; //see cs_lightcull.sc, limit g.count into u_cluster_max_light_count
         LOOP
         for (uint ii=g.offset; ii<g.offset + count; ++ii)
         {

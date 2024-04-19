@@ -37,22 +37,24 @@ lm:source_set "zlib-ng-x86-simd" {
     },
     sources = {
         ZLIBDIR.."/functable.c",
-        ZLIBDIR.."/cpu_features.c",
     },
-    defines = "X86_FEATURES",
+    defines = {
+        "DISABLE_RUNTIME_CPU_DETECTION",
+        "X86_FEATURES",
+    },
     msvc = {
         sources = {
             ZLIBDIR.."/arch/x86/*.c",
         },
         defines = {
             "X86_AVX2",
-            "X86_AVX512VNNI",
-            "X86_AVX512",
             "X86_SSE42",
             "X86_SSSE3",
             "X86_SSE2",
             "X86_PCLMULQDQ_CRC",
-            "X86_VPCLMULQDQ_CRC",
+            --"X86_AVX512",
+            --"X86_AVX512VNNI",
+            --"X86_VPCLMULQDQ_CRC",
         }
     },
 }
@@ -70,13 +72,14 @@ lm:source_set "zlib-ng-x86" {
     },
     sources = {
         ZLIBDIR.."/functable.c",
-        ZLIBDIR.."/cpu_features.c",
         ZLIBDIR.."/arch/x86/x86_features.c",
     },
-    defines =  "X86_FEATURES",
+    defines = {
+        "DISABLE_RUNTIME_CPU_DETECTION",
+        "X86_FEATURES",
+    },
     gcc = {
         defines = {
-            "HAVE_THREAD_LOCAL",
             "HAVE_ATTRIBUTE_ALIGNED",
         },
     },
@@ -95,29 +98,23 @@ lm:source_set "zlib-ng-arm" {
     },
     sources = {
         ZLIBDIR.."/functable.c",
-        ZLIBDIR.."/cpu_features.c",
         ZLIBDIR.."/arch/arm/*.c",
     },
     defines = {
+        "DISABLE_RUNTIME_CPU_DETECTION",
+        "HAVE_ARM_ACLE_H",
         "ARM_FEATURES",
         "ARM_NEON",
         "ARM_NEON_HASLD4",
     },
-    macos = {
-        defines = {
-            "ARM_ACLE",
-        },
-    },
     gcc = {
         defines = {
-            "HAVE_THREAD_LOCAL",
             "HAVE_ATTRIBUTE_ALIGNED",
             "HAVE_BUILTIN_CTZLL",
         },
     },
     clang = {
         defines = {
-            "HAVE_THREAD_LOCAL",
             "HAVE_ATTRIBUTE_ALIGNED",
             "HAVE_BUILTIN_CTZLL",
         },
@@ -136,9 +133,13 @@ lm:source_set "zlib-ng" {
     },
     sources = {
         ZLIBDIR.."/*.c",
+        ZLIBDIR.."/arch/generic/*.c",
         "!"..ZLIBDIR.."/gz*.c",
         "!"..ZLIBDIR.."/functable.c",
         "!"..ZLIBDIR.."/cpu_features.c",
+    },
+    defines = {
+        "DISABLE_RUNTIME_CPU_DETECTION",
     },
     linux = {
         deps = "zlib-ng-x86",
@@ -165,7 +166,6 @@ lm:source_set "zlib-ng" {
     },
     gcc = {
         defines = {
-            "HAVE_THREAD_LOCAL",
             "HAVE_ATTRIBUTE_ALIGNED",
             "HAVE_BUILTIN_CTZ",
             "HAVE_BUILTIN_CTZLL",
@@ -173,7 +173,6 @@ lm:source_set "zlib-ng" {
     },
     clang = {
         defines = {
-            "HAVE_THREAD_LOCAL",
             "HAVE_ATTRIBUTE_ALIGNED",
             "HAVE_BUILTIN_CTZ",
             "HAVE_BUILTIN_CTZLL",
@@ -250,6 +249,7 @@ lm:lua_source "zip-binding" {
     },
     includes = {
         lm.AntDir .. "/3rd/minizip-ng",
+        lm.AntDir .. "/3rd/bee.lua",
         lm.AntDir .. "/clibs/foundation",
         ZLIBDIR,
         "$builddir/gen-zlib",

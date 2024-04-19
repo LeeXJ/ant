@@ -26,7 +26,6 @@ local utils         = require "common.utils"
 local math3d 		= require "math3d"
 local fs            = require "filesystem"
 local lfs           = require "bee.filesystem"
-local fastio        = require "fastio"
 local global_data   = require "common.global_data"
 local editor_setting = require "editor_setting"
 local ientity       = ecs.require "ant.entity|entity"
@@ -432,7 +431,7 @@ end
 
 local function get_prefabs_and_patch_template(glbfilename)
     local localPatchfile = lfs.path(glbfilename):string() .. ".patch"
-    local patch_tpl = lfs.exists(lfs.path(localPatchfile)) and serialize.parse(localPatchfile, fastio.readall_s(localPatchfile)) or {}
+    local patch_tpl = lfs.exists(lfs.path(localPatchfile)) and serialize.load_lfs(localPatchfile) or {}
     local prefab_set = {}
     for _, patch in ipairs(patch_tpl) do
         local k = (patch.file ~= "mesh.prefab") and patch.file or ((patch.op == "copyfile") and patch.path or nil)
@@ -561,7 +560,7 @@ local function cook_prefab(prefab_filename)
     local current_compile_path = fs.path(pl[1]):localpath():string()
     -- utils.mount_memfs(pl[1])
     prefab_filename = prefab_filename:gsub("|", "/")
-    local prefab_template = serialize.parse(prefab_filename, aio.readall(prefab_filename))
+    local prefab_template = serialize.load(prefab_filename)
     for _, tpl in ipairs(prefab_template) do
         if tpl.prefab then
             cook_prefab(tpl.prefab)
@@ -589,7 +588,7 @@ function m:open(filename, prefab_name, patch_tpl)
         self.prefab_name = path_list[2]
         gd.virtual_glb_path = virtual_path
         virtual_path = virtual_path .. "/" .. self.prefab_name
-        self.prefab_template = serialize.parse(virtual_path, aio.readall(virtual_path))
+        self.prefab_template = serialize.load(virtual_path)
 
         self.origin_patch_template = patch_tpl or {}
         self.patch_template = {}
@@ -620,7 +619,7 @@ function m:open(filename, prefab_name, patch_tpl)
         end
         self.patch_start_index = #self.prefab_template - node_idx + 1
     else
-        self.prefab_template = serialize.parse(filename, fastio.readall_s(filename))
+        self.prefab_template = serialize.load_lfs(filename)
     end
 
     self.current_prefab = world:create_instance {
@@ -791,7 +790,7 @@ function m:add_prefab(path)
                     local child = children[1]
                     local e <close> = world:entity(child, "camera?in")
                     if e.camera then
-                        local tpl = serialize.parse(virtual_path, aio.readall(virtual_path))
+                        local tpl = serialize.load(virtual_path)
                         hierarchy:add(child, {template = tpl[1], editor = true, temporary = true}, v_root)
                     end
                 end
@@ -1325,7 +1324,7 @@ function m:do_material_patch(eid, path, v)
     if not self.materials_names then
         -- local ret = utils.split_ant_path(tpl.data.material)
         local fn = gd.virtual_glb_path .. "/materials_names.ant"
-        self.materials_names = serialize.parse(fn, aio.readall(fn))
+        self.materials_names = serialize.load(fn)
     end
     local origin = get_origin_material_name(self.materials_names, tostring(fs.path(tpl.data.material):stem()))
     if not origin then
@@ -1413,10 +1412,6 @@ function m:on_patch_tag(eid, ov, nv, origin_tag, update_tag)
     end
 end
 
-function m:on_patch_tranform(eid, n, v)
-    self:do_patch(eid, "/data/scene/"..n, v)
-end
-
 function m:on_patch_animation(eid, name, path)
     local anim_file_exists
     local remove_index
@@ -1460,19 +1455,41 @@ function m:can_create_empty()
     return self.glb_filename and self.prefab_name == "mesh.prefab"
 end
 
-local event_patch       = world:sub {"PatchEvent"}
+local function focus_aabb(ce, aabb)
+    local aabb_min, aabb_max= math3d.array_index(aabb, 1), math3d.array_index(aabb, 2)
+    local center = math3d.mul(0.5, math3d.add(aabb_min, aabb_max))
+    local dist = -2.0 * math3d.length(math3d.sub(aabb_max, center))
+	local viewdir = iom.get_direction(ce)
+    iom.lookto(ce, math3d.muladd(dist, viewdir, center), viewdir)
+end
+
+local event_patch       = world:sub {"Patch"}
 local event_showground  = world:sub {"ShowGround"}
 local event_showterrain = world:sub {"ShowTerrain"}
 local event_savehitch   = world:sub {"SaveHitch"}
 local event_create      = world:sub {"Create"}
 local event_light       = world:sub {"UpdateDefaultLight"}
 local event_open_file   = world:sub {"OpenFile"}
+local event_save_file   = world:sub {"SaveFile"}
+local event_reload_file = world:sub {"ReloadFile"}
 local event_add_prefab  = world:sub {"AddPrefabOrEffect"}
 local event_hierarchy   = world:sub {"HierarchyEvent"}
+local event_reset_prefab= world:sub {"ResetPrefab"}
+local event_look_at_target 	= world:sub {"LookAtTarget"}
+local event_select_frustum = world:sub {"SelectFrustum"}
 function m:handle_event()
-    for _, eid, path, value in event_patch:unpack() do
-        self:do_patch(eid, path, value)
+    for _, type, eid, path, value in event_patch:unpack() do
+        if type == "Material" then
+            self:do_material_patch(eid, path, value)
+        else
+            self:do_patch(eid, path, value)
+        end
     end
+
+    for _, _ in event_reset_prefab:unpack() do
+        self:reset_prefab()
+    end
+
     for _, enable in event_showground:unpack() do
         self:show_ground(enable)
     end
@@ -1487,6 +1504,13 @@ function m:handle_event()
     end
     for _, enable in event_light:unpack() do
         self:update_default_light(enable)
+    end
+    for _ in event_save_file:unpack() do
+        self:save()
+    end
+    for _ in event_reload_file:unpack() do
+        self:save()
+        self:reload()
     end
     for _, filename, isprefab in event_open_file:unpack() do
         if isprefab then
@@ -1512,6 +1536,41 @@ function m:handle_event()
         elseif what == "clone" then
             self:clone(target)
         end
+    end
+
+	for _, tid, anim in event_look_at_target:unpack() do
+		local target = tid or gizmo.target_eid
+		if target then
+			local aabb = self:get_world_aabb(target)
+			if aabb then
+				if anim then
+					local aabb_min, aabb_max= math3d.array_index(aabb, 1), math3d.array_index(aabb, 2)
+					local center = math3d.tovalue(math3d.mul(0.5, math3d.add(aabb_min, aabb_max)))
+					world:pub {"SmoothLookAt", { center[1], center[2], center[3] }, 2.0 * math3d.length(math3d.sub(aabb_max, center))}
+				else
+					local ce <close> = world:entity(irq.main_camera())
+					focus_aabb(ce, aabb)
+				end
+			end
+		end
+	end
+    for _, frustum in event_select_frustum:unpack() do
+        -- print("--------event_select_frustum--------:", frustum.l, frustum.r, frustum.t, frustum.b)
+        local ce <close> = world:entity(irq.main_camera(), "camera:in")
+        local vp = math3d.mul(math3d.projmat(frustum), math3d.lookto(iom.get_position(ce), math3d.todirection(iom.get_rotation(ce))))
+        -- local frustum_planes = math3d.frustum_planes(vp)
+        local frustum_planes = math3d.frustum_planes(ce.camera.viewprojmat)
+        local select_eids = {}
+        for _, eid in ipairs(self.entities) do
+            local e<close> = world:entity(eid, "render_object?in")
+            local aabb = self:get_world_aabb(eid)
+            if aabb and math3d.frustum_intersect_aabb(frustum_planes, aabb) >= 0 then
+                select_eids[#select_eids + 1] = eid
+                -- print("----selected----:", eid)
+            end
+        end
+        world:pub { "UpdateAABB", select_eids}
+        break
     end
 end
 

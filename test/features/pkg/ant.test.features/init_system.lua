@@ -22,20 +22,23 @@ end
 
 local function init_camera()
     local mq = w:first "main_queue camera_ref:in"
-    local camera_ref<close> = world:entity(mq.camera_ref)
+    local ce<close> = world:entity(mq.camera_ref)
     local eyepos = math3d.vector(0, 10, -10)
-    iom.set_position(camera_ref, eyepos)
+    iom.set_position(ce, eyepos)
     local dir = math3d.normalize(math3d.sub(mc.ZERO_PT, eyepos))
-    iom.set_direction(camera_ref, dir)
+    --iom.set_direction(ce, mc.XAXIS)
+    iom.set_direction(ce, dir)
 end
 
 local function init_light()
     local dl = w:first "directional_light scene:update"
-    --iom.set_direction(dl, math3d.vector(0.0, -1.0, 0.0, 0.0))
-    --rotate x-axis pi/2, y-axis pi/2
-    --iom.set_rotation(dl, math3d.quaternion{math.pi*0.75, math.pi*0.25, 0.0})
-    iom.set_direction(dl, math3d.normalize(math3d.vector(-1.0, -1.0, -1.0, 0.0)))
-    w:submit(dl)
+    if dl then
+        --iom.set_direction(dl, math3d.vector(0.0, -1.0, 0.0, 0.0))
+        --rotate x-axis pi/2, y-axis pi/2
+        --iom.set_rotation(dl, math3d.quaternion{math.pi*0.75, math.pi*0.25, 0.0})
+        iom.set_direction(dl, math3d.normalize(math3d.vector(-1.0, -1.0, -1.0, 0.0)))
+        w:submit(dl)
+    end
 end
 
 function init_loader_sys:init_world()
@@ -61,7 +64,7 @@ function init_loader_sys:camera_usage()
     --     local ray = {o = p0, d = math3d.sub(p0, p1)}
     
     --     local plane = math3d.vector(0, 1, 0, 0)
-    --     local r = math3d.muladd(ray.d, math3d.plane_ray(ray.o, ray.d, plane), ray.o)
+    --     local t, p = math3d.plane_ray(ray.o, ray.d, plane, true)
         
     --     print("click:", x, y, math3d.tostring(r), "view_rect:", vr.x, vr.y, vr.w, vr.h)
     -- end

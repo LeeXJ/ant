@@ -1,6 +1,5 @@
 local luaecs = import_package "ant.luaecs"
 local serialize = import_package "ant.serialize"
-local aio = import_package "ant.io"
 local btime = require "bee.time"
 local inputmgr = require "inputmgr"
 local bgfx = require "bgfx"
@@ -185,7 +184,7 @@ local function create_template(w, filename)
     if not prefab then
         prefab = {}
         w._templates[filename] = prefab
-        local t = serialize.parse(filename, aio.readall(filename))
+        local t = serialize.load(filename)
         for _, v in ipairs(t) do
             if v.prefab then
                 prefab[#prefab+1] = {
@@ -370,13 +369,14 @@ end
 
 local function cpustat_update(w, funcs, symbols)
     local ecs_world = w._ecs_world
+    local monotonic = btime.monotonic
     return function()
         local stat = w._cpu_stat
         for i = 1, #funcs do
-            local f = funcs[i]
-            local now = btime.monotonic()
-            f(ecs_world)
-            local time = btime.monotonic() - now
+            local func = funcs[i]
+            local now = monotonic()
+            func(ecs_world)
+            local time = monotonic() - now
             local name = symbols[i]
             if stat[name] then
                 stat[name] = stat[name] + time

@@ -12,7 +12,8 @@ local iexposure = ecs.require "ant.camera|exposure"
 local imaterial = ecs.require "ant.render|material"
 
 local setting	= import_package "ant.settings"
-local enable_cluster_shading = setting:get "graphic/lighting/cluster_shading"
+local ENABLE_CLUSTER_SHADERING<const> = setting:get "graphic/lighting/cluster_shading/enable"
+local CLUSTER_MAX_LIGHT_COUNT<const> = setting:get "graphic/lighting/cluster_shading/max_light" or 0
 
 local DEFAULT_LIGHT<const> = {
 	directional = {
@@ -277,10 +278,6 @@ local function create_light_buffers()
     return lights, culledlightcount
 end
 
-function ilight.use_cluster_shading()
-	return enable_cluster_shading
-end
-
 local light_buffer = bgfx.create_dynamic_vertex_buffer(1, layoutmgr.get "t40".handle, "ra")
 
 local function update_light_buffers()
@@ -288,7 +285,7 @@ local function update_light_buffers()
 	if #lights ~= 0 then
 		bgfx.update(light_buffer, 0, bgfx.memory_buffer(table.concat(lights, "")))
 	end
-	imaterial.system_attrib_update("u_light_count", math3d.vector(#lights, culledlightcount, 0, 0))
+	imaterial.system_attrib_update("u_light_count", math3d.vector(#lights, culledlightcount, CLUSTER_MAX_LIGHT_COUNT, 0))
 end
 
 function ilight.light_buffer()
@@ -345,7 +342,7 @@ function lightsys:entity_init()
 end
 
 function lightsys:init_world()
-	if not ilight.use_cluster_shading() then
+	if not ENABLE_CLUSTER_SHADERING then
 		imaterial.system_attrib_update("b_light_info", ilight.light_buffer())
 	end
 end

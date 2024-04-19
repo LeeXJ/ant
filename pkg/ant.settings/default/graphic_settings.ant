@@ -10,7 +10,10 @@ graphic:
   inv_z: true
   inf_f: true
   lighting:
-    cluster_shading: 1
+    cluster_shading:
+      enable: true
+      size: {16, 9, 24}
+      max_light: 128
   postprocess:
     blur:
       enable: true
@@ -29,7 +32,7 @@ graphic:
       enable: false
   shadow:
     enable: true
-    filter_mode: pcf
+    filter_mode: evsm
     pcf:
       type: fix4
       size: 4
@@ -37,4 +40,4 @@ graphic:
     evsm:
       sample_radius: 2      #[1/2/3] mean: sample [3/5/7] times in evsm texture blur horizonal/vericial
       filter_type: uniform  #mean: how to filter the reolved depth buffer. can be [gussian/uniform]
-      format: RGBA16F       #[RGBA16F/RGBA32F/RG16F/RG32F], use RGxxF format, mean it will degenerate to vsm
+      format: RGBA32F       #[RGBA16F/RGBA32F/RG16F/RG32F], use RGxxF format, mean it will degenerate to vsm
