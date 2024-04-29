@@ -98,7 +98,7 @@ end
 
 local memfs = import_package "ant.vfs".memory
 function m:init()
-	memfs.init()
+	-- memfs.init()
     world.__EDITOR__ = true
     widget_utils.load_imgui_layout(global_data.editor_root / "imgui.layout")
     window.set_title("Editor")
@@ -152,7 +152,11 @@ function m:post_init()
 end
 
 function m:data_changed()
+
 end
 
 function m:exit()
+	if global_data.fileserver and global_data.fileserver.subprocess then
+		global_data.fileserver.subprocess:wait()
+	end
 end

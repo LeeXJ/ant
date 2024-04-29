@@ -8,8 +8,11 @@ local iom           = ecs.require "ant.objcontroller|obj_motion"
 local mathpkg       = import_package"ant.math"
 local mc            = mathpkg.constant
 
+local iwr           = ecs.require "ant.render|viewport.window_resize"
+local timer         = ecs.require "ant.timer|timer_system"
+
 local common = ecs.require "common"
-common.init_system = "shadow"
+common.init_system = "animation_instances"
 
 local create_instance = ecs.require "util".create_instance
 
@@ -23,7 +26,7 @@ end
 local function init_camera()
     local mq = w:first "main_queue camera_ref:in"
     local ce<close> = world:entity(mq.camera_ref)
-    local eyepos = math3d.vector(0, 10, -10)
+    local eyepos = math3d.vector(0, 10,-10)
     iom.set_position(ce, eyepos)
     local dir = math3d.normalize(math3d.sub(mc.ZERO_PT, eyepos))
     --iom.set_direction(ce, mc.XAXIS)
@@ -44,6 +47,21 @@ end
 function init_loader_sys:init_world()
     init_camera()
     init_light()
+end
+
+local kb_mb = world:sub{"keyboard"}
+local SWITCH
+function init_loader_sys:data_changed()
+    for _, key, press in kb_mb:unpack() do
+        if press == 0 and key == 'X' then
+            if SWITCH then
+                iwr.set_resolution_limits(1280, 720)
+            else
+                iwr.set_resolution_limits(1920, 1080)
+            end
+            SWITCH = not SWITCH
+        end
+    end
 end
 
 function init_loader_sys:camera_usage()

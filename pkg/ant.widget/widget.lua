@@ -92,15 +92,12 @@ local function append_buffers(vbfmt, vb, ibfmt, ib)
 
 	local vertex_offset = vbnum
 	bgfx.update(vbhandle, vertex_offset, bgfx.memory_buffer(vbfmt, vb));
-	ro.vb_num = vertex_offset + numvertices
-	MESH.set_num(ro.mesh_idx, "vb0", ro.vb_num)
+	MESH.set_num(ro.mesh_idx, "vb0", vertex_offset + numvertices)
 	local numindices = #ib
 	if numindices ~= 0 then
 		local _, ibnum, ibhandle = MESH.fetch(ro.mesh_idx, "ib")
 		local index_offset = ibnum
-		if index_offset == 0 then
-			offset_ib(index_offset, ib)
-		end
+		offset_ib(vertex_offset, ib)
 		
 		bgfx.update(ibhandle, index_offset, bgfx.memory_buffer(ibfmt, ib))
 		local ib_num = index_offset + numindices
